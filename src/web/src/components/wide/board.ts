@@ -172,6 +172,8 @@ export interface BoardContext {
   closeDetail: (toRow: boolean) => void;
   /** The right-click menu, under `row`, at `view`. */
   openMenu: (todo: TodoWithUrls, row: HTMLElement, view: MenuView) => void;
+  /** Your list's ⋯ menu, from the keys (the time lists have none). */
+  openColumnMenu: (listId: string) => void;
   openMoveTo: (todo: TodoWithUrls) => void;
   jump: (target: JumpTarget) => void;
   /** Move the list whose sidebar entry has focus one place up or down. */
@@ -385,7 +387,13 @@ export function createBoard(ctx: BoardContext): Board {
     },
     menu: () => {
       const { row, todo } = current();
-      if (row && todo) ctx.openMenu(todo, row, "main");
+      if (row && todo) return ctx.openMenu(todo, row, "main");
+      // On a column with nothing selected: your list's ⋯ menu, as `.` opens
+      // a todo's (principle 7).
+      const at = here();
+      if (!row && isColumnSection(at.id) && !onAdd()) {
+        ctx.openColumnMenu(at.id);
+      }
     },
     remove: () => {
       const { row, todo, done } = current();

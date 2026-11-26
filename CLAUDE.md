@@ -32,6 +32,8 @@ A build with its own `-derivedDataPath` (one per PR, or per iOS/Mac pair, so par
 over Xcode's lock) leaves 3-4GB behind, and nothing clears `/tmp`. A week of those filled the owner's disk
 (55GB, 2026-11). Put the folder in your session's scratchpad, and delete it once the build or test run is
 done, pass or fail. Without a reason to keep builds apart, use Xcode's default DerivedData instead.
+The foreman's own iOS jobs (UI tests, captures, fix-shots) keep theirs in `~/.foreman/derived`, capped
+at 15GB (`scripts/foreman/README.md`, "The iOS lane").
 
 ## Bun
 

@@ -1245,6 +1245,13 @@ describe("WideApp", () => {
     expect(dialogKeys("New list")).toBe("⇧N");
     expect(dialogKeys("Undo")).toBe("Z");
     expect(dialogKeys("Redo")).toBe("⇧Z");
+    // . opens the menu of whatever the keyboard is on: a todo's, or your
+    // list's ⋯ menu, whose button names the key too.
+    expect(dialogKeys("Open menu")).toBe(".");
+    // (The dialog hides the board from the role queries.)
+    expect(
+      document.querySelector('[data-column-menu="list-groceries"]'),
+    ).toHaveAttribute("aria-keyshortcuts", ".");
     // Redo straight after Undo, under Help.
     const labels = [...dialog.querySelectorAll("dt")].map((d) => d.textContent);
     expect(labels.indexOf("Redo")).toBe(labels.indexOf("Undo") + 1);
@@ -1427,18 +1434,21 @@ describe("WideApp", () => {
     const head = document.activeElement as HTMLElement;
     expect(head).toHaveAttribute("data-column-head", "list-someday");
     expect(board).not.toHaveAttribute("data-keyboard");
-    // Its only focus look waits for the keyboard: no ring of its own.
+    // No ring and no tint of its own: the section outline is the only look.
     expect(head).not.toHaveClass("n-focus");
-    expect(head.className).toMatch(
-      /(^| )group-data-\[keyboard\]\/board:focus:bg-/,
-    );
+    expect(head.className).not.toMatch(/(^| )\S*:?focus:bg-/);
   });
 
-  it("→ into an empty column tints its head and lets go of the todo", () => {
+  it("→ into an empty column lets go of the todo, and the todo keys let it be", () => {
     todos = todos.filter((t) => t.listId !== "list-someday");
     const { container } = render(<WideApp />);
     const board = container.querySelector("[data-wide-ready]");
+    const sidebarBar = () =>
+      document
+        .querySelector("aside [data-selection-bar]")
+        ?.closest<HTMLElement>("[data-sidebar-list]")?.dataset.sidebarList;
     act(() => rowButton("Send invoice").focus());
+    expect(sidebarBar()).toBe("list-week");
     press("ArrowRight");
     const head = document.activeElement as HTMLElement;
     expect(head).toHaveAttribute("data-column-head", "list-someday");
@@ -1446,10 +1456,128 @@ describe("WideApp", () => {
     expect(
       container.querySelector("[data-row-container][data-selected]"),
     ).toBeNull();
+    expect(sidebarBar()).toBeUndefined();
     expect(board).toHaveAttribute("data-keyboard");
-    expect(head.className).toContain(
-      "group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]",
+    // The section outline is the only sign: the head takes no tint.
+    expect(head.className).not.toMatch(/(^| )\S*:?focus:bg-/);
+    expect(head.closest("[data-column]")).toHaveAttribute("data-key-section");
+    // The todo keys have nothing to act on.
+    for (const key of ["x", "Backspace", "1", "2", "3", "."]) press(key);
+    expect(update).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(rowIds("list-week")).toEqual(["w1", "w2"]);
+    expect(document.activeElement).toBe(head);
+  });
+
+  it("↓ and j from an empty column reach Add, not typing; Return then types", () => {
+    todos = todos.filter((t) => t.listId !== "list-someday");
+    render(<WideApp />);
+    const addField = () =>
+      screen.getByRole("textbox", { name: "New todo in someday" });
+    for (const key of ["ArrowDown", "j"]) {
+      act(() => rowButton("Send invoice").focus());
+      press("ArrowRight");
+      expect(document.activeElement).toHaveAttribute(
+        "data-column-head",
+        "list-someday",
+      );
+      press(key);
+      expect(document.activeElement).toBe(addField());
+      // On Add, not typing: drawn as a row with the keyboard bar.
+      expect(
+        addField()
+          .closest("[data-column-composer]")
+          ?.querySelector("[data-row-selection-bar]"),
+      ).not.toBeNull();
+    }
+    press("Enter");
+    expect(document.activeElement).toBe(addField());
+    expect(
+      addField()
+        .closest("[data-column-composer]")
+        ?.querySelector("[data-row-selection-bar]"),
+    ).toBeNull();
+  });
+
+  it(". ⇧F10 and the Menu key open your list's ⋯ menu from its column", async () => {
+    render(<WideApp />);
+    for (const init of [
+      { key: "." },
+      { key: "F10", shiftKey: true },
+      { key: "ContextMenu" },
+    ]) {
+      // On the column, nothing selected.
+      act(() => rowButton("Parmesan").focus());
+      press("Escape");
+      const head = document.activeElement as HTMLElement;
+      expect(head).toHaveAttribute("data-column-head", "list-groceries");
+      expect(
+        document.querySelector("[data-row-container][data-selected]"),
+      ).toBeNull();
+      fireEvent.keyDown(head, init);
+      const menu = await screen.findByRole("menu");
+      const items = within(menu).getAllByRole("menuitem");
+      expect(items.map((i) => i.textContent)).toEqual([
+        "Rename",
+        "Hide column",
+        "Copy list ID",
+        "Delete list",
+      ]);
+      await waitFor(() => expect(items[0]).toHaveAttribute("data-highlighted"));
+      // ↑ ↓ move inside it, and the board's keys leave the columns alone.
+      press("ArrowDown");
+      await waitFor(() => expect(items[1]).toHaveAttribute("data-highlighted"));
+      press("ArrowUp");
+      await waitFor(() => expect(items[0]).toHaveAttribute("data-highlighted"));
+      // Esc closes it, and the keyboard is back on the column's head.
+      press("Escape");
+      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      expect(document.activeElement).toBe(head);
+      expect(head.closest("[data-column]")).toHaveAttribute(
+        "data-key-section",
+        "on",
+      );
+    }
+  });
+
+  it(". on a list's column, then Return on Rename, renames it", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Parmesan").focus());
+    press("Escape");
+    press(".");
+    const menu = await screen.findByRole("menu");
+    const rename = within(menu).getByRole("menuitem", { name: "Rename" });
+    await waitFor(() => expect(rename).toHaveAttribute("data-highlighted"));
+    press("Enter");
+    const field = await screen.findByRole("textbox", { name: "List name" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    await userEvent.clear(field);
+    await userEvent.type(field, "Shopping{Enter}");
+    expect(updateList).toHaveBeenCalledWith({
+      id: "list-groceries",
+      input: { name: "Shopping" },
+    });
+  });
+
+  it("the time lists have no ⋯ menu, so . on their column does nothing", () => {
+    render(<WideApp />);
+    act(() => rowButton("Send invoice").focus());
+    press("Escape");
+    expect(document.activeElement).toHaveAttribute(
+      "data-column-head",
+      "list-week",
     );
+    press(".");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("a sidebar entry with the keyboard on it keeps its tint", () => {
+    render(<WideApp />);
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    const entry = within(nav).getByRole("button", { name: "Groceries" });
+    act(() => entry.focus());
+    expect(entry).toHaveClass("n-focus-soft");
   });
 
   it("⇧-digits jump to columns and lists, back to where you were", () => {

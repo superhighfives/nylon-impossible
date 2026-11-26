@@ -7,10 +7,13 @@ name: Test iOS UI
 # `-NylonScreen` routes over in-memory sample data, so there's no network or
 # account.
 #
-# The hosted simulator is too slow for them to pass reliably on every PR, so
-# they run by hand (Actions → Test iOS UI → Run workflow) and before every App
-# Store release (ios-release.yml calls this). They go back on every PR with
-# the self-hosted Mac (#611).
+# On PRs and main they run on the owner's Mac mini, not here: the foreman
+# runs them there and posts the `foreman/ios-ui-test` status (#611,
+# scripts/foreman/README.md, "The iOS lane"). This workflow stays for hand
+# runs (Actions → Test iOS UI → Run workflow) and before every App Store
+# release (ios-release.yml calls this). The hosted simulator is too slow for
+# the timing checks, so here they're skipped (NYLON_SLOW_SIMULATOR below);
+# the mini runs them in full.
 
 on:
   workflow_dispatch:
@@ -41,8 +44,9 @@ jobs:
       - name: Run UI tests
         env:
           # xcodebuild hands TEST_RUNNER_* to the tests with the prefix
-          # stripped, so they see CI=1 and skip the timing checks.
-          TEST_RUNNER_CI: "1"
+          # stripped, so they see NYLON_SLOW_SIMULATOR=1 and skip the timing
+          # checks. Only this runner sets it; the Mac mini doesn't.
+          TEST_RUNNER_NYLON_SLOW_SIMULATOR: "1"
         run: |
           xcrun simctl list runtimes
           DEVICE=$(xcrun simctl list devices available -j | python3 -c "

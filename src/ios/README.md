@@ -203,6 +203,14 @@ the Fastfile's `provisioningProfiles` dict, carrying the same App Group and
 Keychain Sharing capabilities as the app. A missing entry fails the export
 step, not the archive.
 
+The app (not the extensions) also has the **Sign in with Apple** capability
+(`com.apple.developer.applesignin` in both app entitlements files), so the App
+ID carries it and the app's two profiles must include it: "Nylon Impossible"
+for iOS (`PROVISIONING_PROFILE_BASE64`) and "Nylon Impossible Mac AppStore"
+(`MAC_APP_PROFILE_BASE64`). A profile without it fails to sign the archive.
+After regenerating either, update its secret. The share and widget profiles
+don't need it: only the app signs in.
+
 ## Mac
 
 The same targets build a native SwiftUI Mac app (macOS 14+, not Catalyst)
@@ -243,10 +251,12 @@ the few UIKit/AppKit touch points shared code needs go through
   web. The footer opens Settings (the `Settings` scene) and quits; signed
   out, it offers Sign in.
 - **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is a small view on
-  ClerkKit with **Continue with Google** and **Continue with GitHub** — the
-  only strategies the production Clerk instance enables, in a window of its
-  own (`MacSignInWindow`) — via
-  `signInWithOAuth` in an `ASWebAuthenticationSession`. macOS hands that
+  ClerkKit with **Continue with Apple**, **Continue with GitHub** and
+  **Continue with Google** (the strategies the production Clerk instance
+  enables, in the order iOS's `AuthView` sorts them), in a window of its own
+  (`MacSignInWindow`). Apple uses Clerk's native `signInWithApple`, which
+  shows macOS's own Apple ID sheet. The other two use `signInWithOAuth` in an
+  `ASWebAuthenticationSession`. macOS hands that
   session to the default browser, and with Chrome it can stall with no page
   and no error; `MacSignInHandoff` spots a likely stall and offers Start Over
   and a link to the default-browser setting. `KeychainHelper` uses the data

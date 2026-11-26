@@ -38,8 +38,9 @@ bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
             ID) under Native applications (2026-11-24).
       - [x] Apple: add the Sign in with Apple capability to the App ID, then
             regenerate the iOS and Mac App Store profiles and update their
-            secrets (2026-11-24). CI signs with those profiles. The next
-            `ios-deploy` run proves it.
+            secrets (2026-11-24). CI signs with those profiles: the
+            `ios-deploy` run after #854 signed and uploaded both apps
+            (2026-11-26).
       - [x] Apple, for the web: Services ID
             `com.superhighfives.Nylon-Impossible.web` (return URL
             `https://clerk.nylonimpossible.com/v1/oauth_callback`), key
@@ -48,11 +49,12 @@ bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
             once; the owner keeps it.
       - [x] Clerk production: enable the Apple connection with those
             credentials (2026-11-24).
-      - [ ] Code (#848, Ready): the entitlement on iOS and macOS, and an
-            Apple button in `MacSignInView`, ordered Apple, GitHub, Google
-            like iOS's `AuthView`. The PR carries `owner-merge`: the owner
-            merges it, or asks a local session to.
-      - [ ] Sign in with Apple once on the web and once in each app.
+      - [x] Code (#854, from #848): both app targets carry the Sign in with
+            Apple entitlement (not Share or Widget), and the Mac sign-in
+            has Continue with Apple first (Apple, GitHub, Google, as iOS's
+            `AuthView` sorts them), using Clerk's native `signInWithApple`.
+      - [ ] Sign in with Apple once on the web, and once on an iPhone and
+            on the Mac through TestFlight. Tick the parent item then.
 - [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
       recommends it in place of the legacy protection), and consider
       blocking disposable email addresses.

@@ -16,7 +16,12 @@
  *   --parity       Capture manifest.parity's screens on iOS and web and write
  *                  output/parity/parity-{light,dark}.png, each screen as an
  *                  "iOS | Web" pair. For review only: never published.
- *   --skip-ios     Reuse the iOS screenshots already in source/ (no simulator).
+ *   --capture-parity-ios
+ *                  The iOS half of --parity alone, into source/parity/, with
+ *                  no sheet and no Clerk. The Mac mini runs this beside
+ *                  --capture-ios (scripts/foreman/README.md, "The iOS lane").
+ *   --skip-ios     Use the iOS screenshots already in source/ and never start
+ *                  a simulator; a missing one reads "missing".
  *   --strict       Fail if any asset had to fall back to a previous capture.
  *
  * Environment:
@@ -203,13 +208,14 @@ const runWeb = flag("--web") || flag("--all");
 const runPublish = flag("--publish") || flag("--all");
 // Never part of --all: the parity sheet is for review, not for publishing.
 const runParity = flag("--parity");
+const runCaptureParityIOS = flag("--capture-parity-ios");
 
 // Capture is best-effort by default (see capturePhase): a flake degrades to the
 // screenshots already in source/ instead of failing the run. --strict turns
 // that back into a hard failure, so a manual run still tells you the truth.
 const strictCapture = flag("--strict") || process.env.MARKETING_STRICT === "1";
-// Skip the simulator when source/ already holds iOS screenshots for this
-// revision of the app — see the iOS cache in .github/workflows/marketing.yml.
+// The hosted marketing.yml never builds the app: it fetches the Mac mini's
+// iOS shots (the marketing-ios branch) into source/ and sets this.
 const skipIOSCapture =
   flag("--skip-ios") || process.env.MARKETING_SKIP_IOS === "1";
 
@@ -217,12 +223,13 @@ if (
   !runCapture &&
   !runCaptureWeb &&
   !runCaptureIOS &&
+  !runCaptureParityIOS &&
   !runWeb &&
   !runPublish &&
   !runParity
 ) {
   console.error(
-    "Error: specify at least one of --capture, --capture-web, --capture-ios, --web, --publish, --parity, or --all",
+    "Error: specify at least one of --capture, --capture-web, --capture-ios, --capture-parity-ios, --web, --publish, --parity, or --all",
   );
   process.exit(1);
 }
@@ -1067,18 +1074,16 @@ function finishCapture(): void {
 }
 
 async function captureIOSPhases(): Promise<void> {
-  // The iOS screenshots only change when the app does, but building the app
-  // and booting a simulator is the slowest and least reliable part of this
-  // job — so don't do it on a web-only deploy. The cache lookup upstream
-  // decides; here we just double-check the PNGs it claimed to restore exist.
-  const iosCached = IOS_ASSETS.every((a) => existsSync(sourcePath(a)));
-  if (skipIOSCapture && iosCached) {
-    console.log("  Reusing cached iOS screenshots (app unchanged).");
-    for (const asset of IOS_ASSETS) captureStatus.set(asset, "skipped");
-    return;
-  }
+  // With --skip-ios the shots come from elsewhere (the Mac mini, through the
+  // marketing-ios branch), and this runner may not have Xcode at all.
   if (skipIOSCapture) {
-    console.log("  iOS capture was skippable, but no cached PNGs found.");
+    console.log("  Using the iOS screenshots already in source/ (--skip-ios).");
+    for (const asset of IOS_ASSETS)
+      captureStatus.set(
+        asset,
+        existsSync(sourcePath(asset)) ? "skipped" : "missing",
+      );
+    return;
   }
   await openSimulatorWindow();
   // One phase per device class, so a flake on one can't throw away a good
@@ -1090,14 +1095,36 @@ async function captureIOSPhases(): Promise<void> {
   }
 }
 
+/**
+ * The iOS half of the parity sheet, recorded in capture-status.json as
+ * `parity/ios-<screen>-<mode>`, so the Mac mini can tell an all-fresh set.
+ * captureParityIOS removes each shot before taking it, so one that's there
+ * afterwards is fresh.
+ */
+async function captureParityIOSPhase(): Promise<void> {
+  mkdirSync(PARITY_SOURCE, { recursive: true });
+  await captureParityIOS();
+  for (const s of manifest.parity.screens) {
+    for (const mode of MODES) {
+      const there = existsSync(paritySource("ios", s.name, mode));
+      captureStatus.set(
+        `parity/ios-${s.name}-${mode}`,
+        !there ? "missing" : skipIOSCapture ? "skipped" : "fresh",
+      );
+    }
+  }
+}
+
 async function runCaptureStep(opts: {
   web: boolean;
   ios: boolean;
+  parityIOS?: boolean;
 }): Promise<void> {
   console.log("\n── Capture ──────────────────────────────────────");
   mkdirSync(SOURCE_DIR, { recursive: true });
   if (opts.web) await capturePhase("web", WEB_ASSETS, captureWebScreenshots);
   if (opts.ios) await captureIOSPhases();
+  if (opts.parityIOS) await captureParityIOSPhase();
   finishCapture();
 }
 
@@ -1398,18 +1425,17 @@ async function captureParityIOS(): Promise<void> {
   for (const device of Object.keys(simulators) as DeviceKey[]) {
     const mine = screens.filter((s) => s.device === device);
     if (mine.length === 0) continue;
-    // With --skip-ios, a device whose shots are all cached is reused; one
-    // that's missing any (a first run, an earlier flake) is captured.
-    const cached = mine.every((s) =>
-      MODES.every((mode) => existsSync(paritySource("ios", s.name, mode))),
-    );
-    if (skipIOSCapture && cached) {
-      console.log(`  Reusing cached iOS parity screenshots for ${device}.`);
+    // With --skip-ios, the shots already in source/parity are the iOS side
+    // (the Mac mini's), and a missing one shows as "not captured".
+    if (skipIOSCapture) {
+      console.log(
+        `  Using the iOS parity screenshots in source/ for ${device}.`,
+      );
       continue;
     }
-    // Drop whatever the cache restored before capturing: a shot this run
-    // fails to take must show as "not captured", not as an older revision's
-    // screen that would then be saved under this revision's cache key.
+    // Drop any older shot before capturing: a shot this run fails to take
+    // must show as "not captured", not as an older revision's screen that
+    // would then be pushed as this revision's.
     for (const s of mine) {
       for (const mode of MODES)
         rmSync(paritySource("ios", s.name, mode), { force: true });
@@ -1670,8 +1696,12 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
 
   if (runCapture) {
     await runCaptureStep({ web: true, ios: true });
-  } else if (runCaptureWeb || runCaptureIOS) {
-    await runCaptureStep({ web: runCaptureWeb, ios: runCaptureIOS });
+  } else if (runCaptureWeb || runCaptureIOS || runCaptureParityIOS) {
+    await runCaptureStep({
+      web: runCaptureWeb,
+      ios: runCaptureIOS,
+      parityIOS: runCaptureParityIOS,
+    });
   }
   if (runWeb) await runWebStep();
   if (runPublish) runPublishStep();

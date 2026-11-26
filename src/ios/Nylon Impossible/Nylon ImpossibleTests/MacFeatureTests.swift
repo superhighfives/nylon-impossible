@@ -13,6 +13,7 @@
 
 #if os(macOS)
 import AppKit
+import AuthenticationServices
 import Carbon.HIToolbox
 import ClerkKit
 import Foundation
@@ -628,12 +629,39 @@ struct MacFeedbackTests {
 
 @Suite("Mac sign-in")
 struct MacSignInTests {
-    /// Production Clerk enables only Google and GitHub (email codes are off),
-    /// so the Mac must offer exactly those, matching web and iOS.
-    @Test("The Mac offers the providers production Clerk enables")
+    /// Production Clerk enables Apple, GitHub and Google (email codes are
+    /// off), so the Mac must offer exactly those, in the order iOS's
+    /// `AuthView` sorts them.
+    @Test("The Mac offers the providers production Clerk enables, in iOS's order")
     func providersMatchProduction() {
-        #expect(MacSignInView.providers.map(\.provider) == [.google, .github])
-        #expect(MacSignInView.providers.map(\.label) == ["Continue with Google", "Continue with GitHub"])
+        #expect(MacSignInView.providers.map(\.provider) == [.apple, .github, .google])
+        #expect(MacSignInView.providers.map(\.label) == ["Continue with Apple", "Continue with GitHub", "Continue with Google"])
+        #expect(MacSignInView.providers.map(\.key) == ["apple", "github", "google"])
+    }
+
+    /// Apple signs in through the system's own sheet, so it must not take the
+    /// browser flow (or its stall help); the others still do.
+    @Test("Apple uses its own sheet, and the others the browser")
+    func flows() {
+        #expect(MacSignInView.providers.map(\.flow) == [.apple, .oauth, .oauth])
+        #expect(MacSignInView.providers.first?.logo == .symbol("apple.logo"))
+    }
+
+    @Test("Closing a sign-in sheet says nothing; other failures say what went wrong")
+    func errorMessages() {
+        #expect(MacSignInView.message(for: ASAuthorizationError(.canceled), handoff: nil) == nil)
+        #expect(MacSignInView.message(for: ASWebAuthenticationSessionError(.canceledLogin), handoff: nil) == nil)
+        #expect(MacSignInView.message(for: CancellationError(), handoff: nil) == nil)
+
+        let connection = "Couldn’t sign in. Check your connection and try again."
+        #expect(MacSignInView.message(for: ASAuthorizationError(.failed), handoff: nil) == connection)
+        #expect(MacSignInView.message(for: URLError(.notConnectedToInternet), handoff: nil) == connection)
+
+        let handoff = MacSignInHandoff(browser: .other(name: "Google Chrome"), startedAt: .now)
+        #expect(
+            MacSignInView.message(for: ASWebAuthenticationSessionError(.presentationContextInvalid), handoff: handoff)
+                == handoff.refusedMessage
+        )
     }
 
     @Test("Only a complete sign-in or sign-up counts as signed in")
