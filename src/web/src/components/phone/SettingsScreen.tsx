@@ -185,6 +185,10 @@ export function SettingsScreen({
         {[
           { href: "/privacy", label: "Privacy policy" },
           { href: "/terms", label: "Terms of service" },
+          {
+            href: "https://github.com/superhighfives/nylon-impossible/issues/new/choose",
+            label: "Report a problem",
+          },
         ].map((link) => (
           <a
             key={link.href}
