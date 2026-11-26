@@ -166,9 +166,32 @@ API adds it to admins' reports, and the owner adds it to anyone else's.
   `needs-decision`, no open PR for it, and not triaged before
   (`~/.foreman/feedback/<issue>`).
 
+**Anyone else's issue** is cleared by the owner adding `auto-fix` alone
+(the same rule: the label's latest event is the owner adding it). It
+doesn't need `feedback`, which only the API adds; the foreman adds it when
+triage starts. It's cleared only as it was then:
+
+- One GraphQL read returns its title, body, `lastEditedAt` and author. If
+  `lastEditedAt`, or a `renamed` event on the events page `owner_added`
+  reads, is later than the owner's `auto-fix`, it's skipped (`edited_since`),
+  whoever made the edit, the owner included. Each skip is logged; the
+  `feedback_skipped` event and one alert go out once per issue and edit, and
+  nothing is posted on the issue. It isn't marked as triaged, so taking
+  `auto-fix` off and putting it back clears it on the next tick.
+- The triage job checks again, and builds the prompt from the same read
+  (`~/.foreman/feedback/<n>.report.json`), so an edit made after the check
+  can't get in. The prompt says who opened it, and tells the run not to
+  re-read the issue.
+- Images pasted into that body (`user-attachments/assets/<id>`, fixed files)
+  are fetched. Its `feedback-assets` links aren't, nor anything in anyone's
+  comments but the owner's.
+
+The owner's own reports keep needing `feedback` and `auto-fix`, with no edit
+check: they're filed with the owner's token and only the owner can edit them.
+
 Oldest first, one per tick, ahead of Ready items: a report is the owner
 saying "this is wrong now". `foreman triage <n>` does one now, with the same
-checks.
+checks, and refuses an outside issue that's changed since its label.
 
 **Triage.** Claude runs in a fresh worktree on `foreman/<n>-<slug>`, with the
 report's screenshots fetched into `.feedback-assets/` and the trusted
@@ -186,6 +209,15 @@ as well. It decides:
   start revisions even though it has `needs-decision`, which comes off when
   **Open questions** reads "None."; then it goes to Ready and is built. One
   whose triage spec has no questions at all goes straight to Ready.
+  For **anyone else's** issue the run doesn't touch it: it writes the spec,
+  a title, a kind and its questions to `~/.foreman/feedback/<n>.spec/`, and
+  the foreman opens a new issue as `nylon-foreman` (`tracking_issue`), with
+  the report quoted under **Problem** and a link back, labelled `spec` and
+  `feedback` (plus `needs-decision` while it has questions), in Define. The
+  original gets "Tracking this in #m." and keeps the reporter's text. #m's
+  body ends with `<!-- foreman: tracks #n -->`, so its build's PR says
+  `Closes #m, closes #n`. Every spec stays in an issue only the owner and
+  the foreman can edit.
 - **Neither** (a failed run, even after its retry): `needs-decision`, a
   comment with both logs' paths, and back to Ideas. Removing `needs-decision` triages it again.
 
@@ -605,8 +637,12 @@ The repo is public, so:
   the owner moves it, or after a spec run settles it, and a spec run only
   starts from the owner's own reply: the owner engaging with the spec is the
   gate.
-- It only triages feedback reports **opened as the owner** that the owner
-  cleared with `auto-fix`, going by the label event's actor.
+- It only triages issues the owner cleared with `auto-fix`, going by the
+  label event's actor: the owner's own feedback reports, and anyone else's
+  only as they were when the owner added the label. One whose body or title
+  changed after that waits until the owner labels it again. The prompt holds
+  the read that was checked, and an outside issue's unclear spec goes on a
+  new `nylon-foreman` issue, so the build rule above doesn't change.
 - The prompts include only comments by the owner, `nylon-foreman` and
   `claude[bot]`, matched by exact login (and, in review threads, by account
   type), because anyone can register a login that starts with "claude".
