@@ -15,6 +15,11 @@ vi.mock("cloudflare:workers", () => ({
 
 vi.mock("../db", () => ({ getDbClient: () => ({}) }));
 
+const captureException = vi.fn();
+vi.mock("@sentry/cloudflare", () => ({
+  captureException: (...args: unknown[]) => captureException(...args),
+}));
+
 const ensureUserExists = vi.fn();
 vi.mock("../auth", async () => {
   const { Context } = await import("effect");
@@ -47,6 +52,7 @@ describe("withAuthenticatedUser", () => {
   beforeEach(() => {
     ensureUserExists.mockReset();
     limit.mockReset();
+    captureException.mockReset();
     limit.mockResolvedValue({ success: true });
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
@@ -109,6 +115,21 @@ describe("withAuthenticatedUser", () => {
     expect(causeToClientError(exit.cause)).toMatchObject({
       message: "Too many requests. Try again in a minute.",
       status: 429,
+    });
+  });
+
+  it("lets the request through, and reports to Sentry, when the limiter itself fails", async () => {
+    const error = new Error("rate limiter unavailable");
+    limit.mockRejectedValue(error);
+    ensureUserExists.mockResolvedValue(undefined);
+    const callback = vi.fn(() => Effect.succeed("board"));
+
+    const exit = await run(callback);
+
+    expect(exit).toEqual(Exit.succeed("board"));
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: { area: "user-rate-limit" },
     });
   });
 

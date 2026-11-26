@@ -64,8 +64,16 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   // Per-user rate limit for every signed-in route, after the token verifies
-  // (an unverified one never reaches D1). /v1 has its own, per token.
-  const { success } = await c.env.USER_RATE_LIMIT.limit({ key: auth.userId });
+  // (an unverified one never reaches D1). /v1 has its own, per token. It's a
+  // guard, not auth, so if the binding itself fails the request goes through
+  // (and the failure goes to Sentry) instead of every signed-in route 500ing.
+  const success = await c.env.USER_RATE_LIMIT.limit({ key: auth.userId }).then(
+    (outcome) => outcome.success,
+    (error) => {
+      Sentry.captureException(error, { tags: { area: "user-rate-limit" } });
+      return true;
+    },
+  );
   if (!success) {
     c.header("Retry-After", "60");
     return apiError(c, "rate_limited");

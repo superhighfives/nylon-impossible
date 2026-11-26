@@ -101,6 +101,21 @@ describe("USER_RATE_LIMIT", () => {
     }, 120_000);
   }
 
+  it("lets the request through when the limiter itself fails", async () => {
+    const limiter = {
+      limit: vi.fn(async () => {
+        throw new Error("rate limiter unavailable");
+      }),
+    };
+    const res = await call(
+      "/users/me",
+      { token: "session-a" },
+      { USER_RATE_LIMIT: limiter },
+    );
+    expect(res.status).toBe(200);
+    expect(limiter.limit).toHaveBeenCalledWith({ key: USER_A });
+  });
+
   it("isn't counted for a request whose token doesn't verify", async () => {
     mockVerifyToken.mockRejectedValue(new Error("invalid"));
     const limiter = countingLimiter();
