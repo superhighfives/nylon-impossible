@@ -245,6 +245,7 @@ struct MacAccountSettings: View {
             Section {
                 Link("Privacy policy", destination: URL(string: "https://nylonimpossible.com/privacy")!)
                 Link("Terms of service", destination: URL(string: "https://nylonimpossible.com/terms")!)
+                Link("Report a problem", destination: Config.reportProblemURL)
             }
 
             if isSignedIn {

@@ -1,0 +1,18 @@
+name: Suggest an idea
+description: Something you'd like Nylon to do.
+body:
+  - type: markdown
+    attributes:
+      value: Issues are public. Leave out anything private, like your email or the text of your todos.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Nylon to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help you?
+    validations:
+      required: false

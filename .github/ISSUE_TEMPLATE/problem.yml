@@ -1,0 +1,45 @@
+name: Report a problem
+description: Something in Nylon isn't working as it should.
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: Issues are public. Leave out anything private, like your email or the text of your todos.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where?
+      multiple: true
+      options:
+        - Web
+        - iPhone
+        - Mac menu bar
+        - Gmail
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Paste or drag images here.
+    validations:
+      required: false

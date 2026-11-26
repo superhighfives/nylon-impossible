@@ -79,4 +79,9 @@ enum Config {
     static func webURL(forTodo id: UUID, base: URL = webBaseURL) -> URL {
         base.appending(path: "todo/\(id.uuidString.lowercased())")
     }
+
+    // MARK: - Support
+    // GitHub's issue-template chooser (Report a problem or Suggest an idea).
+    // Settings' About links here on the iPhone and the Mac alike.
+    static let reportProblemURL = URL(string: "https://github.com/superhighfives/nylon-impossible/issues/new/choose")!
 }
