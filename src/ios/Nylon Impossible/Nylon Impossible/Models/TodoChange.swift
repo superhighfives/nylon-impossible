@@ -67,7 +67,25 @@ struct TodoChange: Codable, Sendable {
     }
 }
 
+extension TodoChange {
+    /// Most changes one `/todos/sync` accepts (`SYNC_CHANGES_MAX` in
+    /// @nylon-impossible/shared). A longer queue goes in batches of this many.
+    static let syncBatchMax = 500
+}
+
 extension Array where Element == TodoChange {
+    /// The changes in requests of at most `size`, parents before subtasks
+    /// across all of them: the server sorts parents first only within one
+    /// request, and rejects a subtask whose parent it hasn't seen. Always at
+    /// least one batch, so an empty queue still pulls the server's todos.
+    func syncBatches(of size: Int = TodoChange.syncBatchMax) -> [[TodoChange]] {
+        let ordered = orderedForSync()
+        guard !ordered.isEmpty else { return [[]] }
+        return stride(from: 0, to: ordered.count, by: size).map {
+            Array(ordered[$0..<Swift.min($0 + size, ordered.count)])
+        }
+    }
+
     /// Create parent todos before subtasks so self-referential parentId inserts
     /// succeed when both were created offline before the next sync.
     func orderedForSync() -> [TodoChange] {

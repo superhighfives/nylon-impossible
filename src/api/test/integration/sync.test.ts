@@ -1,7 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { and, eq } from "drizzle-orm";
-import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
+import { SYNC_CHANGES_MAX, TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, lists, todos, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedTodo, seedTodoUrl, seedUser } from "../helpers";
@@ -507,6 +507,40 @@ describe("Sync endpoint", () => {
     });
     expect(over.status).toBe(400);
   });
+
+  it("syncs SYNC_CHANGES_MAX changes, and rejects one more without writing any", async () => {
+    expect(SYNC_CHANGES_MAX).toBe(500);
+    const now = new Date().toISOString();
+    const changesOf = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, i) => ({
+        id: crypto.randomUUID(),
+        title: `${prefix} ${i}`,
+        completed: false,
+        position: `a${i}`,
+        updatedAt: now,
+      }));
+    const db = getDb(env.DB);
+    const count = async () =>
+      (
+        await db
+          .select({ id: todos.id })
+          .from(todos)
+          .where(eq(todos.userId, "user_test_123"))
+      ).length;
+
+    const over = await syncRequest({
+      changes: changesOf(SYNC_CHANGES_MAX + 1, "Over"),
+    });
+    expect(over.status).toBe(400);
+    expect((await over.json<any>()).code).toBe("validation_failed");
+    expect(await count()).toBe(0);
+
+    const atCap = await syncRequest({
+      changes: changesOf(SYNC_CHANGES_MAX, "At cap"),
+    });
+    expect(atCap.status).toBe(200);
+    expect(await count()).toBe(SYNC_CHANGES_MAX);
+  }, 60_000);
 
   it("keeps every link when one save adds more than fit in one insert", async () => {
     const now = new Date().toISOString();
