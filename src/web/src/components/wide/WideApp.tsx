@@ -55,6 +55,7 @@ import {
 } from "./board";
 import {
   columnHead,
+  columnMenuButton,
   columnRows,
   rowById,
   sectionOf,
@@ -247,6 +248,8 @@ export function WideApp({
   const cameFrom = useRef<string | null>(null);
   /** Where n opened Quick add from, to go back to. */
   const quickAddFrom = useRef<Element | null>(null);
+  /** The list whose ⋯ menu the keys opened: Esc goes back to its head. */
+  const keyMenu = useRef<string | null>(null);
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
@@ -673,6 +676,28 @@ export function WideApp({
     setKeySection({ id, level: "on" });
   };
 
+  /**
+   * Your list's ⋯ menu, from `.`, ⇧F10 or the Menu key: opened as a press
+   * of its button from the keys, so its first item is highlighted. Closing
+   * it without an item taking focus on puts the keyboard back on the
+   * column's head (`columnMenuClosed`).
+   */
+  const openColumnMenu = (listId: string) => {
+    const button = columnMenuButton(listId);
+    if (!button) return;
+    keyMenu.current = listId;
+    button.focus({ preventScroll: true });
+    button.click();
+  };
+
+  /** A column's ⋯ menu closed: true when the keyboard went back on its head. */
+  const columnMenuClosed = (listId: string, item: boolean) => {
+    if (keyMenu.current !== listId) return false;
+    keyMenu.current = null;
+    if (!item) toSection(listId);
+    return true;
+  };
+
   /** A column's Add: typing, or on it ready to type (`typing` false). */
   const focusAdd = (listId: string, typing: boolean) => {
     const field = composers.current.get(listId);
@@ -887,6 +912,7 @@ export function WideApp({
         view,
       });
     },
+    openColumnMenu,
     openMoveTo: (todo) => setPalette({ mode: "move", todoId: todo.id }),
     jump,
     moveList: (delta) => {
@@ -1112,6 +1138,7 @@ export function WideApp({
         onHide={kind ? undefined : () => hideColumn(list, "board")}
         onCopyId={kind ? undefined : () => copyListId(list)}
         onDelete={kind ? undefined : () => deleteList(list)}
+        onMenuClosed={(item) => columnMenuClosed(list.id, item)}
         icon={
           kind ? undefined : (
             <List size={16} aria-hidden="true" data-icon="list" />
