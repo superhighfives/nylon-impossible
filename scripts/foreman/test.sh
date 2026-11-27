@@ -107,9 +107,9 @@ fetch_all
 
 reason() { guarded_reason "$BASE" "$(case_sha "$1")"; }
 expect "plain change isn't guarded"               ""                                                        "$(reason plain)"
-expect "adding a migration isn't guarded"         ""                                                        "$(reason add-migration)"
-expect "nor renaming one"                         ""                                                        "$(reason rename-migration)"
-expect "nor deleting one"                         ""                                                        "$(reason delete-migration)"
+expect_prefix "adding a migration"                "changes a D1 migration"                                  "$(reason add-migration)"
+expect_prefix "renaming one away"                 "changes a D1 migration"                                  "$(reason rename-migration)"
+expect_prefix "deleting one"                      "changes a D1 migration"                                  "$(reason delete-migration)"
 expect_prefix "a workflow"                        "touches CI or repo automation"                           "$(reason workflow)"
 expect_prefix "renaming a workflow away"          "touches CI or repo automation"                           "$(reason rename-workflow)"
 expect ".claude/ skills aren't guarded"           ""                                                        "$(reason claude-dir)"
@@ -253,7 +253,7 @@ expect "a leftover verified label changes nothing"     "merge $HEAD_SHA"        
 MIG_SHA="$(case_sha add-migration)"
 reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW="[$(review "$MIG_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$MIG_SHA"
-expect "a green migration merges"                     "merge $MIG_SHA"                  "$(gate 7)"
+expect_prefix "a green migration is the owner's"       "guarded: changes a D1 migration" "$(gate 7)"
 WF_SHA="$(case_sha workflow)"
 reset; VIEW=$(jq -c '.headRefName = "foreman/deps-2026-11-02"' <<<"$(view "$WF_SHA" "$GREEN_CHECKS")")
 REVIEW="[$(review "$WF_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
