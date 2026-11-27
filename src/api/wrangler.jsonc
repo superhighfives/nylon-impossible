@@ -68,11 +68,19 @@
   // Per-token rate limit for the public /v1 API (60 requests a minute), keyed
   // on the personal API token's id. Counted per Cloudflare location, so it's
   // approximate: a cheap guard that sets the 429 contract.
+  // USER_RATE_LIMIT is the same guard for every signed-in route (authMiddleware),
+  // keyed on the Clerk user id: 300 a minute, room for quick ticks on two
+  // devices. The web worker has its own (namespace 1003).
   "ratelimits": [
     {
       "name": "V1_RATE_LIMIT",
       "namespace_id": "1001",
       "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "USER_RATE_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 300, "period": 60 },
     },
   ],
   "observability": {
@@ -127,6 +135,11 @@
         "name": "V1_RATE_LIMIT",
         "namespace_id": "1001",
         "simple": { "limit": 60, "period": 60 },
+      },
+      {
+        "name": "USER_RATE_LIMIT",
+        "namespace_id": "1002",
+        "simple": { "limit": 300, "period": 60 },
       },
     ],
     "observability": {

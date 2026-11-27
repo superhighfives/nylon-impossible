@@ -39,7 +39,7 @@ export interface SettleTiming {
 /**
  * Each row's place in `listIds`' columns, captured just before a drop.
  * `shift` is how far a row is drawn from its laid-out place, by its column
- * and index there: the rows a touch drag has parted.
+ * and index there: the rows a drag has parted.
  */
 export function captureRows(
   listIds: string[],
@@ -60,7 +60,7 @@ export function captureRows(
 
 /**
  * Hold each captured row where it was drawn, until the drop's new order
- * renders and `settleRows` eases it on, so rows a touch drag parted don't
+ * renders and `settleRows` eases it on, so rows a drag parted don't
  * spring back for a frame in between.
  */
 export function holdRows(from: SettleFrom) {

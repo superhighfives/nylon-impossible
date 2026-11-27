@@ -112,3 +112,8 @@ To turn one off:
 
 A routine that's off stays due, so it runs on the next tick after it's
 turned back on.
+
+The iOS lane's two jobs, `ui-test` (the `foreman/ios-ui-test` status) and
+`captures` (the iOS marketing shots), aren't on a schedule, but they turn off
+the same two ways. With `ui-test` off, no statuses are posted, so foreman PRs
+wait and stall visibly. `scripts/foreman/README.md`, "The iOS lane".

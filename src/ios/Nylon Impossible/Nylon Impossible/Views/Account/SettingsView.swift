@@ -112,6 +112,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             linkRow("Privacy policy", "https://nylonimpossible.com/privacy")
             linkRow("Terms of service", "https://nylonimpossible.com/terms")
+            linkRow("Report a problem", Config.reportProblemURL.absoluteString)
         }
     }
 

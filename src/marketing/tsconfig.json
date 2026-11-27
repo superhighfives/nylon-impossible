@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["generate.ts", "simulator.ts", "fix-shots.ts"]
+  "include": ["generate.ts", "simulator.ts", "fix-shots.ts", "fix-shots.test.ts"]
 }

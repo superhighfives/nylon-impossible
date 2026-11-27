@@ -1,3 +1,4 @@
+import { RATE_LIMITED_MESSAGE } from "@nylon-impossible/shared";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod/v4";
@@ -42,10 +43,7 @@ export const API_ERRORS = {
     status: 502,
     message: "Couldn’t file that feedback. Try again.",
   },
-  rate_limited: {
-    status: 429,
-    message: "Too many requests. Try again in a minute.",
-  },
+  rate_limited: { status: 429, message: RATE_LIMITED_MESSAGE },
   internal_error: { status: 500, message: "Something went wrong. Try again." },
 } as const satisfies Record<string, { status: number; message: string }>;
 

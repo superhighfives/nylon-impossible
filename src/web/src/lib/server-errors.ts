@@ -1,3 +1,4 @@
+import { RATE_LIMITED_MESSAGE } from "@nylon-impossible/shared";
 import * as Sentry from "@sentry/cloudflare";
 import { Cause, Option } from "effect";
 
@@ -30,6 +31,9 @@ const taggedErrorToClientError = (error: {
     case "UnauthorizedError":
     case "UserNotFoundError":
       return new ServerFnError("Unauthorized", 401);
+
+    case "RateLimitedError":
+      return new ServerFnError(RATE_LIMITED_MESSAGE, 429);
 
     case "TodoNotFoundError":
     case "ListNotFoundError":

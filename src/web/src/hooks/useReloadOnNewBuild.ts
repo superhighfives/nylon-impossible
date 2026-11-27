@@ -5,10 +5,13 @@ export const BUILD_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 /**
  * Something is being edited: a focused field, or a composer holding a draft
- * that hasn't been added yet. Everything else already saved as it was typed
- * (Settled "Saving"), so a reload loses nothing.
+ * that hasn't been added yet. Or a toast still offers its action ("Done ·
+ * Undo"): a reload would drop it, and with it the chance to undo (#830).
+ * Everything else already saved as it was typed (Settled "Saving"), so a
+ * reload loses nothing.
  */
 function isEditing(): boolean {
+  if (document.querySelector("[data-toast-action]")) return true;
   const active = document.activeElement;
   if (active?.closest("input, textarea, select, [contenteditable]")) {
     return true;
@@ -23,7 +26,7 @@ function isEditing(): boolean {
  * back into view (or regains focus), it asks the web worker which commit is
  * live (`GET /version`, at most once every 10 minutes) and, if that isn't the
  * commit this bundle was built from, reloads in place. It never reloads over
- * an edit: it waits for the next time the tab is shown. Local dev has no
+ * an edit or an Undo: it waits for the next time the tab is shown. Local dev has no
  * commit, so it never checks. #691.
  */
 export function useReloadOnNewBuild() {

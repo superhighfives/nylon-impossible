@@ -1,4 +1,5 @@
 import {
+  SYNC_CHANGES_MAX,
   TEXT_URL_PATTERN,
   TODO_NOTES_MAX,
   toDueDay,
@@ -50,33 +51,36 @@ const recurrenceSchema = z.object({
 // Sync request schema
 const syncRequestSchema = z.object({
   lastSyncedAt: z.union([z.null(), z.coerce.date()]).optional(),
-  changes: z.array(
-    z.object({
-      id: z.string().uuid(),
-      // Parent todo id for subtasks; null/absent for top-level todos. Honoured
-      // only on create — parentId is immutable, so it is ignored on update.
-      parentId: z.string().uuid().nullable().optional(),
-      title: z.string().min(1).optional(),
-      notes: z.string().max(TODO_NOTES_MAX).nullable().optional(),
-      completed: z.boolean().optional(),
-      position: z.string().optional(),
-      // Normalized to UTC midnight — due dates are calendar days.
-      dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
-      recurrence: recurrenceSchema.nullable().optional(),
-      // When a repeat is completed, the client advances dueDate and sends the
-      // completion timestamp here (completed stays false). Cleared to null to
-      // undo before local midnight.
-      completedAt: z.coerce.date().nullable().optional(),
-      updatedAt: z.coerce.date(),
-      deleted: z.boolean().optional(),
-      ...pinnedRequestFields,
-      listId: listIdSchema.optional(),
-      urls: z
-        .array(z.object({ url: z.string().url().max(2048) }))
-        .max(10)
-        .optional(),
-    }),
-  ),
+  changes: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        // Parent todo id for subtasks; null/absent for top-level todos. Honoured
+        // only on create — parentId is immutable, so it is ignored on update.
+        parentId: z.string().uuid().nullable().optional(),
+        title: z.string().min(1).optional(),
+        notes: z.string().max(TODO_NOTES_MAX).nullable().optional(),
+        completed: z.boolean().optional(),
+        position: z.string().optional(),
+        // Normalized to UTC midnight — due dates are calendar days.
+        dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
+        recurrence: recurrenceSchema.nullable().optional(),
+        // When a repeat is completed, the client advances dueDate and sends the
+        // completion timestamp here (completed stays false). Cleared to null to
+        // undo before local midnight.
+        completedAt: z.coerce.date().nullable().optional(),
+        updatedAt: z.coerce.date(),
+        deleted: z.boolean().optional(),
+        ...pinnedRequestFields,
+        listId: listIdSchema.optional(),
+        urls: z
+          .array(z.object({ url: z.string().url().max(2048) }))
+          .max(10)
+          .optional(),
+      }),
+    )
+    // Bounds the per-change D1 work one request can ask for; the apps batch.
+    .max(SYNC_CHANGES_MAX),
 });
 
 // What the notes clean-up strips once a todo's links are stored: a URL (or an

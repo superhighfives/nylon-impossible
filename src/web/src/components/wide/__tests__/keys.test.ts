@@ -41,6 +41,8 @@ describe("commandForKey", () => {
     [{ key: "g" }, "go"],
     [{ key: "k", metaKey: true }, "palette"],
     [{ key: "k", ctrlKey: true }, "palette"],
+    [{ key: "ArrowUp", altKey: true }, "move-list-up"],
+    [{ key: "ArrowDown", altKey: true }, "move-list-down"],
   ])("%o → %s", (e, id) => {
     expect(idFor(e)).toBe(id);
   });
@@ -96,6 +98,22 @@ describe("the registry", () => {
     expect(keyHint("go-today")).toBe("⇧1");
     expect(keyHint("palette")).toBe("⌘K");
     expect(keyHint("done")).toBe("X");
+  });
+});
+
+describe("Move list up and down", () => {
+  it("are ⌥↑ and ⌥↓, under Lists in the shortcuts, apart from the plain arrows", () => {
+    const lists = COMMANDS.filter((c) => c.group === "Lists").map((c) => [
+      c.label,
+      keyHint(c.id),
+    ]);
+    expect(lists).toEqual([
+      ["Move list up", "⌥↑"],
+      ["Move list down", "⌥↓"],
+    ]);
+    // ⌥ with anything else is still the browser's.
+    expect(idFor({ key: "ArrowLeft", altKey: true })).toBeNull();
+    expect(idFor({ key: "ArrowUp", altKey: true, metaKey: true })).toBeNull();
   });
 });
 

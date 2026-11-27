@@ -41,7 +41,6 @@ describe("empty line", () => {
           collapsing={new Set()}
           highlightedId={null}
           selectedId={null}
-          indicator={null}
           composer={<div data-testid="composer" />}
           empty="Nothing here yet."
           loading={false}

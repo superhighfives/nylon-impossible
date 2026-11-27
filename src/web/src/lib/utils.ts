@@ -1,10 +1,12 @@
 import { env } from "cloudflare:workers";
+import * as Sentry from "@sentry/cloudflare";
 import { Effect, Exit, Schedule } from "effect";
 import type { User } from "./auth";
 import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
 import { type DbClient, getDbClient } from "./db";
 import {
   DatabaseError,
+  RateLimitedError,
   type UnauthorizedError,
   type UserNotFoundError,
 } from "./errors";
@@ -54,13 +56,29 @@ export const withAuthenticatedUser = <A, E>(
   callback: (user: User, db: DbClient) => Effect.Effect<A, E>,
 ): Effect.Effect<
   A,
-  E | DatabaseError | UnauthorizedError | UserNotFoundError,
+  E | DatabaseError | RateLimitedError | UnauthorizedError | UserNotFoundError,
   AuthService
 > =>
   Effect.gen(function* () {
     // Get authenticated user from AuthService
     const authService = yield* AuthService;
     const user = yield* authService.getUser;
+
+    // Per-user rate limit, before the first D1 write (ensureUserExists). It's
+    // a guard, not auth, so if the binding itself fails the request goes
+    // through (and the failure goes to Sentry) instead of failing.
+    const success = yield* Effect.promise(() =>
+      env.USER_RATE_LIMIT.limit({ key: user.id }).then(
+        (outcome) => outcome.success,
+        (error) => {
+          Sentry.captureException(error, { tags: { area: "user-rate-limit" } });
+          return true;
+        },
+      ),
+    );
+    if (!success) {
+      return yield* new RateLimitedError({ userId: user.id });
+    }
 
     // Get database client for this request
     const db = yield* Effect.try({

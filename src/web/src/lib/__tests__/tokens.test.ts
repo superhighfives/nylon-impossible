@@ -104,7 +104,7 @@ describe("design token generator", () => {
   it("emits the board's column widths and hatch, for the web only", () => {
     const css = renderCss(tokens);
     expect(css).toContain("--n-board-column-min-width: 17rem;");
-    expect(css).toContain("--n-board-column-max-width: 35rem;");
+    expect(css).toContain("--n-board-column-max-width: 30rem;");
     expect(css).toContain("--n-board-hatch-angle: 45deg;");
     expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
     expect(css).toContain("--n-board-hatch-opacity: 0.4;");
@@ -332,6 +332,31 @@ describe("design token generator", () => {
       expect(box(phone.display)).toEqual([46, 46, 700]);
       expect(box(wide.display)).toEqual([40, 40, 700]);
       expect(box(phone.sheetTitle)).toEqual([32, 35, 700]);
+    });
+
+    // Notes are supporting detail, a step under the title (#835). The
+    // phone role is the web phone's and Apple's, at Dynamic Type's
+    // subheadline; wide.notes stays for subtasks and the empty line.
+    it("sets the notes a step under the title, on the phone and wide", () => {
+      const { phone, wide } = tokens.type as Record<
+        string,
+        Record<string, Style>
+      >;
+      expect([phone.noteBody.size, phone.noteBody.lineHeight]).toEqual([
+        15, 21,
+      ]);
+      expect(phone.noteBody.iosTextStyle).toBe("subheadline");
+      expect([wide.noteBody.size, wide.noteBody.lineHeight]).toEqual([13, 18]);
+      expect(wide.noteBody.iosTextStyle).toBeUndefined();
+      expect(phone.notes).toBeUndefined();
+      expect([wide.notes.size, wide.notes.lineHeight]).toEqual([15, 21]);
+      expect(css).toContain("--text-n-phone-note-body: 0.9375rem;");
+      expect(css).toContain("--text-n-wide-note-body: 0.8125rem;");
+      expect(css).toContain("--text-n-wide-note-body--line-height: 1.125rem;");
+      expect(css).not.toContain("--text-n-phone-notes:");
+      expect(swift).toContain(
+        "static let noteBody = Style(size: 15, lineHeight: 21, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline, tracking: 0)",
+      );
     });
 
     it("gives every role whole-pixel values, a known font and a 100–900 weight", () => {

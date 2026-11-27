@@ -7,6 +7,12 @@
 //  composer, so pulling that row down while adding a todo showed a spinner
 //  there. Sync runs on foreground and from pushes.
 //
+//  This test only drives the fix-shots recording; it asserts nothing. The
+//  spinner shows only while the finger is down, a drag can't be queried
+//  until it lifts, and by then the spinner has gone: with the bug, a query
+//  straight after found no activity indicator (#542). The recording is the
+//  evidence.
+//
 
 import XCTest
 
@@ -41,7 +47,5 @@ final class PullToRefreshUITests: NylonUITestCase {
             withVelocity: .slow,
             thenHoldForDuration: 1.5
         )
-
-        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "pulling the chip row down started a refresh")
     }
 }

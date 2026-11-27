@@ -39,6 +39,8 @@ export interface Board {
   redo: () => void;
   palette: () => void;
   jump: (target: JumpTarget) => void;
+  /** ⌥↑ (-1) and ⌥↓ (1): the list whose sidebar entry has focus, one place. */
+  moveList: (delta: 1 | -1) => void;
   startGo: () => void;
   goToList: () => void;
   shortcuts: () => void;
@@ -54,6 +56,8 @@ interface Binding {
   shift?: boolean;
   /** ⌘ on a Mac, Ctrl elsewhere. */
   mod?: boolean;
+  /** ⌥ on a Mac, Alt elsewhere. */
+  alt?: boolean;
   /** Only straight after G. */
   afterG?: boolean;
   /** Passed to `run`: which of your lists ⇧4…⇧9 means, or `ADD_HERE`. */
@@ -69,6 +73,7 @@ export type CommandGroup =
   | "Move around"
   | "Todo"
   | "Go to"
+  | "Lists"
   | "Create"
   | "Notes"
   | "Help";
@@ -351,6 +356,25 @@ export const COMMANDS: Command[] = [
     run: (b) => b.palette(),
   },
 
+  // Lists: on one of your lists' sidebar entries. The palette offers them
+  // for that list, or the one with the selection (`paletteGroups`).
+  {
+    id: "move-list-up",
+    label: "Move list up",
+    keys: [["⌥", "↑"]],
+    bindings: [{ key: "ArrowUp", alt: true }],
+    group: "Lists",
+    run: (b) => b.moveList(-1),
+  },
+  {
+    id: "move-list-down",
+    label: "Move list down",
+    keys: [["⌥", "↓"]],
+    bindings: [{ key: "ArrowDown", alt: true }],
+    group: "Lists",
+    run: (b) => b.moveList(1),
+  },
+
   // Create
   {
     id: "new-todo",
@@ -443,6 +467,7 @@ export const GROUPS: CommandGroup[] = [
   "Move around",
   "Todo",
   "Go to",
+  "Lists",
   "Create",
   "Notes",
   "Help",
@@ -476,7 +501,7 @@ interface KeyEventLike {
 function matches(b: Binding, e: KeyEventLike, afterG: boolean): boolean {
   if (!!b.afterG !== afterG) return false;
   const mod = !!(e.metaKey || e.ctrlKey);
-  if (!!b.mod !== mod || e.altKey) return false;
+  if (!!b.mod !== mod || !!b.alt !== !!e.altKey) return false;
   if (b.code) return e.code === b.code && !!e.shiftKey === !!b.shift;
   if (!b.key) return false;
   // Letters compare case-blind. Shift has to match for letters (⇧N) and

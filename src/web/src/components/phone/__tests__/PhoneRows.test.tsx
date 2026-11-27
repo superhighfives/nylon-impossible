@@ -40,7 +40,6 @@ const drag = (over: Partial<PhoneDrag>): PhoneDrag => ({
   mode: "touch",
   from: 0,
   slot: 2,
-  lineY: null,
   gapY: 96,
   height: 48,
   tilt: 1,
@@ -48,45 +47,42 @@ const drag = (over: Partial<PhoneDrag>): PhoneDrag => ({
 });
 
 describe("PhoneRows", () => {
-  it("fills a touch drag's gap with soft yellow, where the rows part", () => {
-    renderRows(drag({}));
-    const gap = document.querySelector<HTMLElement>("[data-drop-gap]");
-    expect(gap?.style.top).toBe("96px");
-    expect(gap?.style.height).toBe("48px");
-    expect(gap?.firstElementChild).toHaveClass(
-      "bg-n-brand-soft",
-      "rounded-n-field",
-    );
-    // The rows that part for it: the ones the dragged row passes.
-    const parted = [
-      ...document.querySelectorAll<HTMLElement>("li[data-phone-row]"),
-    ].map((li) => li.style.transform);
-    expect(parted.slice(1)).toEqual(["translateY(-48px)", "translateY(-48px)"]);
-    // A gap, not a line: no border, no text.
-    expect(gap).toHaveTextContent("");
-    expect(document.querySelector("[data-drop-indicator]")).toBeNull();
-  });
+  it.each(["touch", "pointer"] as const)(
+    "fills a %s drag's gap with soft yellow, where the rows part",
+    (mode) => {
+      renderRows(drag({ mode }));
+      const gap = document.querySelector<HTMLElement>("[data-drop-gap]");
+      expect(gap?.style.top).toBe("96px");
+      expect(gap?.style.height).toBe("48px");
+      expect(gap?.firstElementChild).toHaveClass(
+        "bg-n-brand-soft",
+        "rounded-n-field",
+      );
+      // The rows that part for it: the ones the dragged row passes.
+      const parted = [
+        ...document.querySelectorAll<HTMLElement>("li[data-phone-row]"),
+      ].map((li) => li.style.transform);
+      expect(parted.slice(1)).toEqual([
+        "translateY(-48px)",
+        "translateY(-48px)",
+      ]);
+      // A gap, not a line: no border, no text.
+      expect(gap).toHaveTextContent("");
+      expect(document.querySelector("[data-drop-indicator]")).toBeNull();
+      expect(document.querySelector("[data-drop-dot]")).toBeNull();
+    },
+  );
 
-  it("lifts the touched row tilted by its drag's angle", () => {
-    renderRows(drag({ tilt: -0.7 }));
-    const card = document
-      .querySelector("[data-lifted]")
-      ?.querySelector<HTMLElement>("[data-row-card]");
-    expect(card).toHaveClass("n-lifted");
-    expect(card?.style.getPropertyValue("--n-drag-tilt")).toBe("-0.7deg");
-  });
-
-  it("a pointer drag draws the line with its dot, and no gap", () => {
-    renderRows(drag({ mode: "pointer", gapY: null, lineY: 48 }));
-    expect(document.querySelector("[data-drop-gap]")).toBeNull();
-    const line = document.querySelector("[data-drop-indicator]");
-    expect(line).toHaveClass("bg-n-brand", "h-0.5");
-    expect(line?.querySelector("[data-drop-dot]")).toHaveClass(
-      "bg-n-brand",
-      "size-2",
-      "ring-2",
-      "ring-n-canvas",
-      "animate-n-dot-in",
-    );
-  });
+  it.each(["touch", "pointer"] as const)(
+    "lifts the %s-dragged row tilted by its drag's angle, not faded",
+    (mode) => {
+      renderRows(drag({ mode, tilt: -0.7 }));
+      const lifted = document.querySelector("[data-lifted]");
+      const card = lifted?.querySelector<HTMLElement>("[data-row-card]");
+      expect(card).toHaveClass("n-lifted");
+      expect(card?.style.getPropertyValue("--n-drag-tilt")).toBe("-0.7deg");
+      expect(lifted).toHaveClass("cursor-grabbing");
+      expect(lifted).not.toHaveClass("opacity-35");
+    },
+  );
 });

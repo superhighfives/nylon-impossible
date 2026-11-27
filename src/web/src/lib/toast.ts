@@ -1,5 +1,6 @@
 import type { ToastManagerAddOptions } from "@base-ui/react/toast";
 import { Toast } from "@base-ui/react/toast";
+import { RATE_LIMITED_MESSAGE } from "@nylon-impossible/shared";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -70,10 +71,15 @@ const SAYS_WHAT_TO_DO = new Set(["invalid_url", "rate_limited"]);
  * The toast for a failed action: its settled sentence ("Couldn’t add the
  * link"), as the apps say it, not the server's or browser's message ("Request
  * failed (500)", "Failed to fetch"). The exception is an API error written
- * for people that says what to do (`invalid_url`, `rate_limited`).
+ * for people that says what to do (`invalid_url`, `rate_limited`), or a
+ * server function's rate limit, which arrives as a plain Error carrying the
+ * same message.
  */
 export function messageFromError(err: unknown, fallback: string): string {
   if (err instanceof ApiError && err.code && SAYS_WHAT_TO_DO.has(err.code)) {
+    return err.message;
+  }
+  if (err instanceof Error && err.message === RATE_LIMITED_MESSAGE) {
     return err.message;
   }
   return fallback;

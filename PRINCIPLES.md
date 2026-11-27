@@ -13,7 +13,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 3. **Done means gone.** A checked todo leaves straight away, with Undo. It doesn't move to another column, page or section.
 4. **Todo rows carry information, not controls.** Actions live in gestures, context menus and the keyboard. Todo rows have no visible handles, toolbars or chevrons. Other rows, like sidebar entries, may carry controls.
 5. **One design, many densities.** Phone, wide screen, the menu bar and the Gmail card share the same structure, the same order and the same words.
-6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts. Native means native to the input, not the device. Touch works the same on every touch layout: long-press to drag, rows that part to make room, immediate feedback. A pointer works the same wherever there's one: a drop line, hover, a click to select.
+6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts. Native means native to the input, not the device. A drag works the same with every input, on every layout: the row lifts, the rows part to make room, immediate feedback. Touch long-presses to start one; a pointer starts as it moves, and keeps hover and a click to select.
 7. **Keyboard first where there's a keyboard.** On wide screens and in the menu bar, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere. The keyboard is either on a section (the sidebar, a column, the open todo) or in it. Tab, ⇧Tab and ← → move between sections; Return steps in and Esc steps out. Inside, the arrow keys move through items, and in a form, keys do ordinary form things. The section with the keyboard has a light outline.
 8. **Things don't jump.** Space that something might need (a banner) is kept whether or not it's showing. When columns move to make room, they slide; they never jump.
 9. **Settled stays settled.** Decisions below need a written reason to reopen, not a polish pass.
@@ -31,8 +31,8 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Saving | Every edit saves instantly. No Save or Cancel anywhere |
 | Wide layout | One row of columns that scrolls sideways: Today, This week, Someday, every list you haven't hidden, then Done. Hide or show a list from the sidebar. Opening a todo lays a sheet beside its column |
 | Selecting on wide | One click selects. A second click, a double click or Enter opens the todo in a sheet beside its column |
-| Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
-| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. One exception: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move. Focus is never yellow |
+| Dropping with a pointer | The todo lands in the gap nearest the pointer, where the rows part to make room. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
+| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Focus is never yellow |
 | Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9. The error toast fills with `#CE2C31` in both appearances, with light text and a light outline. |
 | Moving between lists by drag | The web board only. On a phone layout a todo moves through its menu (Move to) |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
@@ -84,21 +84,20 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 | Pressed | Nothing extra: the click selects, and the selection is the feedback | — | — | — | — |
 | Selected by click | `fill`, chip radius | — | — | — | — |
 | Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | On Add, not typing: as a row, `fill` plus the `inkMuted` bar | `fill` |
-| Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface`, 20% `ink` over it, and a 2px `ink` ring, 2px out | — |
+| Focused by keyboard | Same as selected by keyboard: rows have no ring | Nothing: the section outline shows it | 20% of its text colour | `surface`, 20% `ink` over it, and a 2px `ink` ring, 2px out | — |
 | Focused by click | Same as selected by click | Nothing visible | Nothing extra | `surface` and the 20% `ink` tint, no ring | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
-| Drop target with a pointer | A 2pt/2px `brand` line in the gap where the todo will land, with an 8pt `brand` dot at its leading end | — | `brand` fill, `brandInk` text | — | — |
-| Drop target by touch | Rows part around a `brandSoft` gap the dragged row's height, no line | — | `brand` fill, `brandInk` text | — | — |
-| Column as a drop target | The line only, no column fill | — | — | — | — |
-| Dragging (source) with a pointer | The original row stays, faded to 35% | — | — | — | — |
-| Drag preview with a pointer | `surface` card, `hairline` border, field radius, tilted at random up to 1.5° either way, checkbox and title | — | — | — | — |
-| Dragging by touch | The row lifts, raised and tilted, and follows the finger; no faded original | — | — | — | — |
+| Drop target | Rows part around a `brandSoft` gap the dragged row's height, no line | — | `brand` fill, `brandInk` text | — | — |
+| Column as a drop target | The gap only, no column fill | — | — | — | — |
+| Dragging | The row lifts, raised and tilted, and follows the pointer or finger; no faded original | — | — | — | — |
+| Dragging one of your lists (pointer or touch) | — | — | The entry lifts, raised and tilted, and follows the pointer or finger up and down; no faded original. The time lists don't drag | — | — |
+| Drop target for a list | — | — | The other entries of your lists part around a `brandSoft` gap the entry's height, no line. Never among the time lists | — | — |
 
 - **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.
-- **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the column head's tint follow it, not the browser's own guess at `:focus-visible`.
-- **Dropping.** The whole column accepts a drop, and the line always shows where the todo will land: over a row, the gap its nearer half points to; below the rows or in an empty column, after the last row. Releasing puts the todo where the line was. Done and an open todo aren't drop targets, and nothing draws a line over the sidebar.
-- **Dragging by touch.** A finger holds a row for 450ms within 10px to lift it, with the row's menu; moving turns that into a drag. The gap goes where the line would, and there's one on the board at a time: its own column closes up once the finger leaves it, and the column under the finger parts.
+- **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the section outline follow it, not the browser's own guess at `:focus-visible`.
+- **Dropping.** The whole column accepts a drop, and the gap always shows where the todo will land: over a row, the slot its nearer half points to; below the rows or in an empty column, after the last row. Releasing puts the todo where the gap was. There's one gap on the board at a time: its own column closes up once the pointer or finger leaves it, and the column under it parts. Done and an open todo aren't drop targets, and nothing parts over the sidebar.
+- **Dragging by touch.** A finger holds a row for 450ms within 10px to lift it, with the row's menu; moving turns that into a drag.
 - **Moving.** Moving a todo (1 / 2 / 3, Move to…, the menu's Move) keeps it selected, and the keyboard goes with it to its new column. Done and Delete hand the selection to the next todo.
 - **Dividers.** Every divider (between columns, the header rule, the sidebar edge, the toolbar's bottom) is `hairline`, 1px/1pt, drawn once. The open todo's sheet has none: its own `surface`, radius and shadow set it apart. With Increase Contrast (`prefers-contrast: more` on the web) every colour with a `highContrast` value takes it.
 

@@ -121,6 +121,11 @@ struct TodoDetailSheet: View {
         .task { await loadUrls() }
         #if DEBUG
         .onAppear {
+            // The code note, being edited.
+            if screenRoute == .notescodeedit {
+                editNotes()
+                return
+            }
             // The notes at their limit, being edited, with the toast up.
             guard screenRoute == .notesmax else { return }
             editNotes()

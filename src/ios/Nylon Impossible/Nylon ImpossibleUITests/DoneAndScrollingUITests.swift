@@ -24,7 +24,7 @@ final class DoneAndScrollingUITests: NylonUITestCase {
     }
 
     func testDoneHoldsInPlaceThenLeavesWithUndo() throws {
-        try XCTSkipIf(onCI, "Done's hold is 400ms; the CI simulator is too slow for the timing — runs locally")
+        try XCTSkipIf(slowSimulator, "Done's hold is 400ms; the hosted simulator is too slow for the timing — runs locally and on the Mac mini")
         launch("today")
         let target = todayRow("Call Mum about Sunday lunch")
         let next = todayRow("Finish quarterly report")
@@ -70,7 +70,7 @@ final class DoneAndScrollingUITests: NylonUITestCase {
     }
 
     func testDoneUnderLoad() throws {
-        try XCTSkipIf(onCI, "The toast's 2s budget; the CI simulator is too slow for the timing — runs locally")
+        try XCTSkipIf(slowSimulator, "The toast's 2s budget; the hosted simulator is too slow for the timing — runs locally and on the Mac mini")
         launch("perf")
         // The first row repeats, so done advances it and toasts its next
         // date: the hold, the commit and the toast, over 500 todos.

@@ -1,3 +1,10 @@
+/**
+ * The API's `rate_limited` message, and the web server functions' when a user
+ * is over their limit. It says what to do, so a failed action's toast shows it
+ * in place of the action's own sentence.
+ */
+export const RATE_LIMITED_MESSAGE = "Too many requests. Try again in a minute.";
+
 /** The due words that are lowercase mid-sentence; weekdays and months keep their capitals. */
 const RELATIVE_DAYS = new Set(["Today", "Tomorrow", "Yesterday"]);
 

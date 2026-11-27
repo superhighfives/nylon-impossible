@@ -14,7 +14,7 @@ import { columnPart } from "@/lib/dragOrder";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
-import { DropDot } from "./useBoardDrag";
+import { isListDrag } from "./useListDrag";
 
 /**
  * The rows beside the open sheet: all but the selected one recede, and the
@@ -41,15 +41,7 @@ export function isColumnBackground(target: EventTarget | null): boolean {
   );
 }
 
-/** The slot a drag would drop into, and where to draw the line. */
-export interface DropIndicator {
-  listId: string;
-  index: number;
-  /** Offset from the top of the column's row list (`data-drop-area`), in px. */
-  y: number;
-}
-
-/** Where a touch drag's gap opens: its slot, and its top in the drop area. */
+/** Where a drag's gap opens: its slot, and its top in the drop area. */
 export interface DropGap {
   listId: string;
   /** The slot among the column's other rows, clamped to the todo's tier. */
@@ -58,8 +50,8 @@ export interface DropGap {
   top: number;
 }
 
-/** A row lifted by a finger, which the columns part around. */
-export interface TouchDrag {
+/** A row lifted by a pointer or a finger, which the columns part around. */
+export interface LiftDrag {
   /** The column it was lifted from, and its index among the rows there. */
   listId: string;
   from: number;
@@ -69,7 +61,7 @@ export interface TouchDrag {
   gap: DropGap | null;
 }
 
-/** Rows parting around a touch drag: they slide, unless motion is reduced. */
+/** Rows parting around a drag: they slide, unless motion is reduced. */
 const PART_TRANSITION =
   "transform var(--n-duration-fast) var(--n-ease-out-strong)";
 
@@ -109,14 +101,11 @@ const RECEDE = "opacity-(--n-sheet-recede)";
 
 /**
  * A focused column head. A click on the column's empty space focuses it so
- * the keys know which column you're in, and shows nothing; with the keyboard
- * in use (the board root's `data-keyboard`) it takes the sidebar cursor's
- * soft tint. Gated on the board's own modality rather than `:focus-visible`,
- * whose guess after a programmatic `focus()` varies by browser. Forced
- * colours drop the tint, so there it gets a system-coloured outline instead.
+ * the keys know which column you're in, and the keys put the keyboard on it.
+ * Neither shows anything here: the section's outline already says where the
+ * keyboard is (States, "Column head"), and draws in forced colours too.
  */
-export const HEAD_FOCUS =
-  "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)] forced-colors:group-data-[keyboard]/board:focus:outline-2 forced-colors:group-data-[keyboard]/board:focus:outline-solid";
+const HEAD_FOCUS = "outline-none";
 
 /** A menu's popup and items: the column's ⋯ menu, the sidebar's right-click. */
 export const MENU_POPUP =
@@ -142,6 +131,7 @@ export function ColumnHeader({
   onHide,
   onCopyId,
   onDelete,
+  onMenuClosed,
   sheetOpen = false,
 }: {
   listId: string;
@@ -167,6 +157,12 @@ export function ColumnHeader({
   /** Your list's column: Copy list ID, for the personal API. */
   onCopyId?: () => void;
   onDelete?: () => void;
+  /**
+   * The ⋯ menu closed; `item` when an item it ran took focus on (Rename,
+   * Hide column, Delete list). True when the caller put the keyboard back
+   * itself, as the board does after its keys open the menu.
+   */
+  onMenuClosed?: (item: boolean) => boolean;
   /** The column's todo is open: clear of the sheet, and receded. */
   sheetOpen?: boolean;
 }) {
@@ -263,6 +259,9 @@ export function ColumnHeader({
       <div className="absolute top-3 right-(--n-sheet-overlap) flex items-center gap-0.5">
         {onDelete && (
           <Menu.Root
+            onOpenChange={(open) => {
+              if (open) fromMenu.current = false;
+            }}
             onOpenChangeComplete={(open) => {
               if (open || !hideOnClose.current) return;
               hideOnClose.current = false;
@@ -271,6 +270,8 @@ export function ColumnHeader({
           >
             <Menu.Trigger
               aria-label={`${title} options`}
+              aria-keyshortcuts="."
+              data-column-menu={listId}
               className={ICON_BUTTON}
             >
               <Ellipsis size={16} aria-hidden="true" />
@@ -278,7 +279,10 @@ export function ColumnHeader({
             <Menu.Portal>
               <Menu.Positioner align="end" sideOffset={4} className="z-50">
                 <Menu.Popup
-                  finalFocus={() => !fromMenu.current}
+                  finalFocus={() => {
+                    const item = fromMenu.current;
+                    return !(onMenuClosed?.(item) ?? false) && !item;
+                  }}
                   className={MENU_POPUP}
                 >
                   {onRename && (
@@ -312,7 +316,12 @@ export function ColumnHeader({
                   )}
                   <Menu.Item
                     className={`${MENU_ITEM} text-n-destructive`}
-                    onClick={onDelete}
+                    onClick={() => {
+                      // The column leaves; the one before it takes the
+                      // keyboard (`deleteList`).
+                      fromMenu.current = true;
+                      onDelete();
+                    }}
                   >
                     Delete list
                   </Menu.Item>
@@ -332,22 +341,22 @@ export function ColumnHeader({
 
 /**
  * A row a pointer or a finger can pick up from anywhere except its checkbox.
- * While a finger drags (`touch`), the lifted row's card stands in for it, so
+ * While a row is dragged (`lifting`), the lifted card stands in for it, so
  * its slot empties, and the others shift by `offset` to part around the gap.
  */
 function DraggableRow({
   todo,
   listId,
-  touch,
+  lifting,
   offset,
   animate,
   ...props
 }: Omit<
   TodoRowProps,
-  "bodyProps" | "containerProps" | "dragging" | "density" | "rowStyle"
+  "bodyProps" | "containerProps" | "density" | "rowStyle"
 > & {
   listId: string;
-  touch: boolean;
+  lifting: boolean;
   offset: number;
   animate: boolean;
 }) {
@@ -363,10 +372,9 @@ function DraggableRow({
       {...props}
       todo={todo}
       density="wide"
-      dragging={isDragging && !touch}
-      away={isDragging && touch}
+      away={isDragging}
       rowStyle={
-        touch
+        lifting
           ? {
               transform: offset ? `translateY(${offset}px)` : undefined,
               transition: animate ? PART_TRANSITION : "none",
@@ -389,9 +397,10 @@ function DraggableRow({
 /**
  * One board column: an Archivo title and subline on the shared baseline, a
  * hairline, the "+ Add" composer, then the rows. The whole column accepts a
- * dropped todo; `indicator` marks the slot it would land in. While its todo
- * is open (`sheetOpen`) the sheet lies over its right edge: the contents
- * move in clear of it, and everything but the selected row recedes.
+ * dropped todo, and its rows part around `lift`'s gap where it would land.
+ * While its todo is open (`sheetOpen`) the sheet lies over its right edge:
+ * the contents move in clear of it, and everything but the selected row
+ * recedes.
  */
 export function Column({
   listId,
@@ -403,8 +412,7 @@ export function Column({
   collapsing,
   highlightedId,
   selectedId,
-  indicator,
-  touch = null,
+  lift = null,
   animate = true,
   settle = null,
   composer,
@@ -419,6 +427,7 @@ export function Column({
   onHide,
   onCopyId,
   onDelete,
+  onMenuClosed,
   onBackgroundClick,
   sheetOpen = false,
   resetKey,
@@ -435,9 +444,8 @@ export function Column({
   collapsing: ReadonlySet<string>;
   highlightedId: string | null;
   selectedId: string | null;
-  indicator: DropIndicator | null;
-  /** A touch drag on the board: the rows part around its gap. */
-  touch?: TouchDrag | null;
+  /** A drag on the board: the rows part around its gap. */
+  lift?: LiftDrag | null;
   /** False under reduced motion: rows part without sliding. */
   animate?: boolean;
   /** Where rows sat at a drop, so they ease into the new order. */
@@ -465,6 +473,8 @@ export function Column({
   onCopyId?: () => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
+  /** Its ⋯ menu closed (`ColumnHeader`). */
+  onMenuClosed?: (item: boolean) => boolean;
   /** A click on the column's empty space: focus it, select nothing. */
   onBackgroundClick?: () => void;
   /** Its todo is open, in the sheet beside it. */
@@ -479,10 +489,16 @@ export function Column({
   /** The keyboard is on Add, not typing: the row keyboard bar beside it. */
   addSelected?: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
+  const {
+    setNodeRef,
+    isOver: over,
+    active,
+  } = useDroppable({
     id: columnDropId(listId),
     data: { listId },
   });
+  // A list being reordered in the sidebar drops nowhere on the board.
+  const isOver = over && !isListDrag(active);
   const headingId = `column-${listId}-title`;
   const listRef = useRef<HTMLUListElement>(null);
   const settled = useRef<Settle | null>(null);
@@ -503,14 +519,14 @@ export function Column({
   const tabStopId = rows.some((r) => r.id === selectedId)
     ? selectedId
     : (rows[0]?.id ?? null);
-  // A touch drag's part in this column: lifted from it, its gap in it, both
-  // or neither. Rows count as the drag measures them, collapsing ones aside.
-  const from = touch?.listId === listId ? touch.from : null;
-  const gap = touch?.gap?.listId === listId ? touch.gap : null;
+  // A drag's part in this column: lifted from it, its gap in it, both or
+  // neither. Rows count as the drag measures them, collapsing ones aside.
+  const from = lift?.listId === listId ? lift.from : null;
+  const gap = lift?.gap?.listId === listId ? lift.gap : null;
   const live = rows.filter((r) => !collapsing.has(r.id)).map((r) => r.id);
   const offset = (id: string) =>
-    touch
-      ? columnPart(from, gap?.index ?? null, live.indexOf(id), touch.height)
+    lift
+      ? columnPart(from, gap?.index ?? null, live.indexOf(id), lift.height)
       : 0;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard reaches a column through its rows and title
@@ -536,6 +552,7 @@ export function Column({
         onHide={onHide}
         onCopyId={onCopyId}
         onDelete={onDelete}
+        onMenuClosed={onMenuClosed}
         sheetOpen={sheetOpen}
       />
       <div
@@ -569,12 +586,12 @@ export function Column({
         ) : (
           <ViewBoundary view="column" resetKey={resetKey}>
             <div data-drop-area={listId} className="relative min-h-24">
-              {gap && touch && (
+              {gap && lift && (
                 // Under the rows, filling the space they part to leave.
                 <div
                   aria-hidden="true"
                   data-drop-gap
-                  style={{ top: gap.top, height: touch.height }}
+                  style={{ top: gap.top, height: lift.height }}
                   className={`pointer-events-none absolute -inset-x-2.5 ${
                     animate
                       ? "transition-[top] duration-(--n-duration-fast) ease-n-out"
@@ -619,23 +636,13 @@ export function Column({
                       highlighted={highlightedId === todo.id}
                       selected={selectedId === todo.id}
                       tabStop={tabStopId === todo.id}
-                      touch={!!touch}
+                      lifting={!!lift}
                       offset={collapsing.has(todo.id) ? 0 : offset(todo.id)}
                       animate={animate}
                       {...rowCallbacks}
                     />
                   ))}
                 </ul>
-              )}
-              {indicator && indicator.listId === listId && (
-                <div
-                  aria-hidden="true"
-                  data-drop-indicator
-                  style={{ top: indicator.y }}
-                  className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-                >
-                  <DropDot />
-                </div>
               )}
             </div>
           </ViewBoundary>

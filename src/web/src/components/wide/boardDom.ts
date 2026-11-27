@@ -57,6 +57,13 @@ export function columnHead(listId: string): HTMLElement | null {
   );
 }
 
+/** Your list's ⋯ button, in its column's head. The time lists have none. */
+export function columnMenuButton(listId: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(
+    `[data-column-menu="${CSS.escape(listId)}"]`,
+  );
+}
+
 /**
  * The section `el` is in: the sidebar, the sheet or a column, and whether
  * `el` is the section's own anchor (the sidebar, the sheet, a column's

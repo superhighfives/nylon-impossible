@@ -25,13 +25,42 @@ Two rules keep it that way, and both are easy to undo by accident:
   workflow can't be given `continue-on-error`, so coupling them is all-or-
   nothing.
 
-The iOS screenshots are cached against `hashFiles('src/ios/**', …)`, so a
-web-only deploy skips the Xcode build and simulator entirely — that's most of
-the runtime and nearly all of the flakiness. Only a fully fresh iOS set (every
-`ios-*` entry in `capture-status.json`) is written back to that cache; caching
-a reused one would pin stale screenshots to a revision they don't belong to.
-To regenerate by hand, dispatch the workflow with `force_ios` (it also runs
-`strict` by default, so a fallback fails rather than passing quietly).
+## Where the iOS shots come from
+
+Not from `marketing.yml` (#611). The hosted runner spent 25–44 minutes of
+each iOS run on a cold platform download, build and simulator boot, so the
+foreman takes them on the owner's Mac mini, where all of that stays warm
+(`scripts/foreman/README.md`, "The iOS lane"):
+
+- After a merge that changes `src/ios`, `src/shared/design`,
+  `src/shared/src/todo-date-fixtures.json` or `manifest.json`, it runs
+  `generate.ts --capture-ios --capture-parity-ios` in a checkout of `main`'s
+  scripts with that commit's iOS paths.
+- An all-fresh set (every entry in `capture-status.json`) is force-pushed to
+  the orphan **`marketing-ios`** branch as one parentless commit:
+  `source/ios-*.png`, `source/parity/ios-*.png`, `capture-status.json` and
+  `revision.json` (the commit and the git ids of those paths). A partial set
+  is never pushed: it would pin stale shots to a revision they don't belong
+  to. Don't commit to that branch by hand.
+- Then it dispatches `marketing.yml` (`strict=false`), worked or not.
+
+`marketing.yml` has no Xcode steps. It fetches `marketing-ios` into
+`src/marketing/source/` and runs with `MARKETING_SKIP_IOS=1`, which never
+starts a simulator: a missing iOS shot reads `missing`. Its `ios-shots` job
+compares `revision.json` with the deployed commit's ids. After a deploy that
+changed the app and isn't captured yet, the `workflow_run` trigger skips
+publishing with a notice, and the foreman's dispatch publishes once both
+halves are fresh. Otherwise it publishes, with a warning if the iOS set is
+an older revision's.
+
+So if the mini is off, or `captures` is turned off (`routines` skill), the
+web shots don't publish after a deploy that changed the app, until someone
+dispatches `marketing.yml` by hand (Actions → Marketing → Run workflow, with
+`strict` off, to publish over the older iOS set).
+
+To recapture by hand, on the mini: `foreman captures --force`. A hand
+dispatch of `marketing.yml` runs `strict` by default, so a fallback fails
+rather than passing quietly.
 
 ## What gets captured
 
@@ -49,7 +78,8 @@ same weekday and date.
 - **iOS** needs no account. It launches the DEBUG build with
   `-NylonScreen <route>` (plus `-NylonDark`), which skips sign-in and draws
   in-memory sample data, on a simulator the script creates for itself
-  (6.9" iPhone).
+  (6.9" iPhone). On the mini, with DerivedData in
+  `~/.foreman/derived/marketing` (`MARKETING_DERIVED_DATA`).
 - `--web` writes the composite (browser + iPhone), a raw
   App Store set in `output/app-store/` (uploaded as a workflow artifact;
   App Store Connect upload is manual), and WebP shots for the web landing page
@@ -59,6 +89,8 @@ same weekday and date.
   `output/parity/parity-{light,dark}.png`, each screen an "iOS | Web" pair.
   It uses simulators of its own ("Nylon Parity …"), is uploaded from
   `marketing.yml` as the `parity-sheet` artifact, and is never published.
+  `--capture-parity-ios` takes only its iOS half, with no Clerk: the mini
+  runs that, and the hosted `--parity` uses those shots.
 
 ## Audit
 

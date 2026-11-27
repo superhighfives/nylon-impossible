@@ -148,6 +148,47 @@ function extractHostname(url: string): string | null {
 /** Timeout for metadata fetch requests (10 seconds) */
 const FETCH_TIMEOUT_MS = 10_000;
 
+/**
+ * Most of a response body read for its metadata. The tags sit in `<head>`, so
+ * a page or a file bigger than this is cut off rather than read in full (or
+ * until the timeout) just to find them.
+ */
+export const MAX_BODY_BYTES = 512 * 1024;
+
+/**
+ * A response body as text, read as a stream and stopped at `maxBytes`. The
+ * rest is cancelled, so a 500 MB download ends here, not at the timeout.
+ */
+export async function readCappedText(
+  response: Response,
+  maxBytes = MAX_BODY_BYTES,
+): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value.subarray(0, maxBytes - total);
+      chunks.push(chunk);
+      total += chunk.byteLength;
+    }
+  } finally {
+    // Best-effort: what we need is already read, and a failed cancel only
+    // means the rest of the body was already gone.
+    reader.cancel().catch(() => {});
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 // Matches a tweet permalink and captures its numeric id, e.g.
 // x.com/user/status/123, twitter.com/i/web/status/123.
 const TWEET_URL_RE =
@@ -204,7 +245,7 @@ async function fetchTweetMetadata(id: string): Promise<UrlMetadata | null> {
 
   let data: TweetResult;
   try {
-    data = (await response.json()) as TweetResult;
+    data = JSON.parse(await readCappedText(response)) as TweetResult;
   } catch {
     return null;
   }
@@ -286,7 +327,7 @@ export async function fetchUrlMetadataResult(
 
   let html: string;
   try {
-    html = await response.text();
+    html = await readCappedText(response);
   } catch {
     return { ok: false, metadata: NULL_METADATA };
   }

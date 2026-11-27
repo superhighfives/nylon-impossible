@@ -15,7 +15,7 @@ extension TodoDetailSheet {
     /// switch moves nothing but the text (principle 8). Empty notes are
     /// always the editor, with its "Add notes" placeholder.
     var notesField: some View {
-        let style = Theme.Fonts.Role.body
+        let style = Theme.Fonts.Role.notes
         let hasNotes = Self.storedNotes(notes) != nil
         let rendered = hasNotes && !editingNotes
         // From 90% of the limit, while editing, the count sits at the end

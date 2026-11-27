@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchUrlMetadataResult } from "../../src/lib/url-metadata";
+import {
+  fetchUrlMetadataResult,
+  MAX_BODY_BYTES,
+  readCappedText,
+} from "../../src/lib/url-metadata";
 
 // Build minimal HTML with requested meta tags
 function makeHtml(parts: {
@@ -41,10 +45,7 @@ function makeHtml(parts: {
 function stubFetchOk(html: string): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(html),
-    }),
+    vi.fn().mockResolvedValue(new Response(html)),
   );
 }
 
@@ -55,11 +56,7 @@ function stubFetchError(err: Error): void {
 function stubFetchStatus(status: number): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
-      ok: false,
-      status,
-      text: () => Promise.resolve(""),
-    }),
+    vi.fn().mockResolvedValue(new Response("", { status })),
   );
 }
 
@@ -270,25 +267,61 @@ describe("fetchUrlMetadataResult", () => {
       expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
 
-    it("returns null metadata when response.text() throws", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: true,
-          text: () => Promise.reject(new Error("body read failed")),
-        }),
-      );
+    it("returns null metadata when reading the body throws", async () => {
+      const body = new ReadableStream({
+        pull(controller) {
+          controller.error(new Error("body read failed"));
+        },
+      });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
       const result = await fetchUrlMetadataResult("https://example.com");
       expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
   });
 
+  describe("body cap", () => {
+    it("reads at most 512 KiB of an endless body, cancels the rest, and keeps its <head>", async () => {
+      const encoder = new TextEncoder();
+      const filler = encoder.encode("x".repeat(64 * 1024));
+      let pulled = 0;
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(makeHtml({ ogTitle: "Huge File" }).slice(0, -14)),
+          );
+        },
+        pull(controller) {
+          pulled += filler.byteLength;
+          controller.enqueue(filler);
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+
+      const result = await fetchUrlMetadataResult(
+        "https://downloads.example.com/big.iso",
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.metadata.title).toBe("Huge File");
+      expect(result.metadata.siteName).toBe("downloads.example.com");
+      expect(cancelled).toBe(true);
+      // A chunk or two of read-ahead past the cap, never the whole stream.
+      expect(pulled).toBeLessThan(MAX_BODY_BYTES + 4 * filler.byteLength);
+    });
+
+    it("stops readCappedText at the cap", async () => {
+      const text = await readCappedText(new Response("abcdef"), 4);
+      expect(text).toBe("abcd");
+    });
+  });
+
   describe("request behaviour", () => {
     it("sends NylonBot User-Agent header", async () => {
-      const mockFetchFn = vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve("<title>Test</title>"),
-      });
+      const mockFetchFn = vi.fn().mockResolvedValue(new Response("<title>Test</title>"));
       vi.stubGlobal("fetch", mockFetchFn);
 
       await fetchUrlMetadataResult("https://example.com");
@@ -302,10 +335,8 @@ describe("fetchUrlMetadataResult", () => {
     });
 
     it("follows redirects", async () => {
-      const mockFetchFn = vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve("<title>Redirected Page</title>"),
-      });
+      const mockFetchFn = vi.fn()
+        .mockResolvedValue(new Response("<title>Redirected Page</title>"));
       vi.stubGlobal("fetch", mockFetchFn);
 
       await fetchUrlMetadataResult("https://example.com");
@@ -321,15 +352,13 @@ describe("fetchUrlMetadataResult", () => {
     const TWEET_URL = "https://x.com/nifinet/status/2072704249663004773?s=46";
 
     it("pulls tweet text, author, and image from the syndication endpoint", async () => {
-      const stub = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            text: "Just shipped a thing",
-            user: { name: "Nicolas Finet", screen_name: "nifinet" },
-            photos: [{ url: "https://pbs.twimg.com/media/abc.jpg" }],
-          }),
-      });
+      const stub = vi.fn().mockResolvedValue(
+        Response.json({
+              text: "Just shipped a thing",
+              user: { name: "Nicolas Finet", screen_name: "nifinet" },
+              photos: [{ url: "https://pbs.twimg.com/media/abc.jpg" }],
+            }),
+      );
       vi.stubGlobal("fetch", stub);
 
       const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
@@ -344,14 +373,12 @@ describe("fetchUrlMetadataResult", () => {
     });
 
     it("strips a trailing media t.co link from the tweet text", async () => {
-      const stub = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            text: "Check this out https://t.co/LDwScMtine",
-            user: { name: "Nicolas Finet", screen_name: "nifinet" },
-          }),
-      });
+      const stub = vi.fn().mockResolvedValue(
+        Response.json({
+              text: "Check this out https://t.co/LDwScMtine",
+              user: { name: "Nicolas Finet", screen_name: "nifinet" },
+            }),
+      );
       vi.stubGlobal("fetch", stub);
 
       const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
@@ -359,14 +386,12 @@ describe("fetchUrlMetadataResult", () => {
     });
 
     it("uses a null description for a media-only tweet", async () => {
-      const stub = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            text: "https://t.co/LDwScMtine",
-            user: { name: "Nicolas Finet", screen_name: "nifinet" },
-          }),
-      });
+      const stub = vi.fn().mockResolvedValue(
+        Response.json({
+              text: "https://t.co/LDwScMtine",
+              user: { name: "Nicolas Finet", screen_name: "nifinet" },
+            }),
+      );
       vi.stubGlobal("fetch", stub);
 
       const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
@@ -377,12 +402,9 @@ describe("fetchUrlMetadataResult", () => {
     it("falls back to the HTML scrape when syndication fails", async () => {
       const stub = vi.fn(async (input: RequestInfo | URL) => {
         if (String(input).includes("syndication")) {
-          return { ok: false, status: 404 } as Response;
+          return new Response("", { status: 404 });
         }
-        return {
-          ok: true,
-          text: () => Promise.resolve(makeHtml({ ogTitle: "Scraped Title" })),
-        } as unknown as Response;
+        return new Response(makeHtml({ ogTitle: "Scraped Title" }));
       });
       vi.stubGlobal("fetch", stub);
 

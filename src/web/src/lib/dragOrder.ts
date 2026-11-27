@@ -93,8 +93,8 @@ export function slotAt(mids: number[], y: number): number {
  * gap nearer `y` (`slotAt` over the rows' middles), clamped to its tier.
  * `rows` is every row in the column, top to bottom, in the same coordinates
  * as `y`, including the dragged one at `dragged` (-1 when it's from another
- * column); `items` is the column's order. The line and the touch gap both
- * come from it, so a finger and a pointer land a todo in the same place.
+ * column); `items` is the column's order. The gap comes from it, for a
+ * finger and a pointer alike.
  */
 export function dropSlot<T extends Orderable>(
   items: T[],
@@ -116,42 +116,10 @@ export interface RowSpan {
 }
 
 /**
- * Where the drop line for `slot` goes: the boundary between the two rows a
- * todo dropped there lands between, in the same coordinates as `rows`. Above
- * the first row for slot 0, below the last for the end slot. Null when there
- * are no rows.
- *
- * `rows` is every row in the column, top to bottom, including the dragged one
- * at `dragged` (-1 when it's in another column), which keeps its space while
- * faded. `slot` counts the *other* rows, as `slotAt` and `dropPlacement` do,
- * so the dragged row's own slot has two edges: the line takes whichever is
- * nearer the pointer at `y`.
- */
-export function dropLineY(
-  rows: RowSpan[],
-  slot: number,
-  dragged: number,
-  y: number,
-): number | null {
-  if (rows.length === 0) return null;
-  // The gap in `rows` the line marks: just before rows[gap].
-  let gap = dragged < 0 || slot < dragged ? slot : slot + 1;
-  if (slot === dragged) {
-    const own = rows[dragged];
-    gap = y - own.top <= own.bottom - y ? dragged : dragged + 1;
-  }
-  const above = rows[gap - 1];
-  const below = rows[gap];
-  if (!above) return below.top;
-  if (!below) return above.bottom;
-  return (above.bottom + below.top) / 2;
-}
-
-/**
- * How far the row at `index` shifts while a touch drag parts the rows: the
+ * How far the row at `index` shifts while a drag parts the rows: the
  * dragged row (from `from`, `height` tall) is headed for `slot` among the
  * others, so the rows between give up its space. Zero for the dragged row
- * itself, which follows the finger.
+ * itself, which follows the pointer or finger.
  */
 export function partOffset(
   from: number,
@@ -165,7 +133,7 @@ export function partOffset(
 }
 
 /**
- * Where the gap a touch drag opens starts, from the top of the row list:
+ * Where the gap a drag opens starts, from the top of the row list:
  * the space the parted rows leave for the dragged row (`spans[from]`, as tall
  * as it) at `slot` among the others. It sits where `partOffset` moves the
  * rows away from. Null if the spans aren't measured.
@@ -184,11 +152,11 @@ export function gapTop(
 }
 
 /**
- * How far the row at `index` of one board column shifts during a touch drag.
+ * How far the row at `index` of one board column shifts during a drag.
  * `from` is the dragged row's index if it started in this column, else null;
- * `slot` is the gap's slot among the column's other rows if the finger is
+ * `slot` is the gap's slot among the column's other rows if the drag is
  * over this column, else null. Its own column parts around the gap
- * (`partOffset`) or, once the finger leaves, closes up; another column parts
+ * (`partOffset`) or, once the drag leaves, closes up; another column parts
  * to open the gap. One column holds the gap at a time.
  */
 export function columnPart(
@@ -207,7 +175,7 @@ export function columnPart(
 }
 
 /**
- * Where the gap a touch drag opens in a board column starts, in the rows'
+ * Where the gap a drag opens in a board column starts, in the rows'
  * coordinates: as `gapTop` in the dragged row's own column (`from`), and in
  * another column above the row at `slot`, below the last row, or at the top
  * of an empty column.

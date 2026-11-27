@@ -24,6 +24,9 @@ enum SyncErrorMessage {
         switch error as? APIError {
         case .unauthorized?:
             return "Sign in again to keep syncing."
+        case .serverError(429, _, _)?:
+            // The API's own rate_limited message, which says what to do.
+            return "Too many requests. Try again in a minute."
         case .serverError(let code, _, _)? where code >= 500:
             return "Nylon’s server had a problem. Your changes are safe here."
         case .serverError?:

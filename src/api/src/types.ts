@@ -43,6 +43,10 @@ export type Env = {
     // Workers rate limit for /v1, keyed on the personal API token's id
     // (60 requests a minute). In wrangler.jsonc, top level and `previews`.
     V1_RATE_LIMIT: RateLimit;
+    // Workers rate limit for every route behind authMiddleware, keyed on the
+    // Clerk user id (300 requests a minute). In wrangler.jsonc, top level and
+    // `previews`.
+    USER_RATE_LIMIT: RateLimit;
   };
   Variables: {
     userId: string;

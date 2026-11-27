@@ -151,6 +151,8 @@ struct SyncErrorLineTests {
             (APIError.unauthorized(url: url), "Sign in again to keep syncing."),
             (APIError.serverError(503, "<html>…", url: url), "Nylon’s server had a problem. Your changes are safe here."),
             (APIError.serverError(422, "bad", url: url), "The server didn’t accept the changes."),
+            (APIError.serverError(400, "bad", url: url), "The server didn’t accept the changes."),
+            (APIError.serverError(429, "rate_limited", url: url), "Too many requests. Try again in a minute."),
             (APIError.networkError(URLError(.cannotFindHost), url: url), "Can’t reach Nylon right now. Your changes are safe here.")
         ]
         for (error, expected) in cases {

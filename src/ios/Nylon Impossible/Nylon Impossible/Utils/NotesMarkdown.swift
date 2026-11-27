@@ -33,7 +33,9 @@ enum NotesMarkdown {
 
     enum Kind: Equatable {
         case paragraph(AttributedString)
-        /// Drawn as body-sized bold text, so a note never outshouts the title.
+        /// Drawn at the notes' size in semibold (`NotesMarkdownView`), so a
+        /// note never outshouts the title and a heading reads apart from
+        /// inline bold. Its runs carry only their own inline intents.
         case heading(AttributedString)
         case code(String)
         case quote([Block])
@@ -163,7 +165,7 @@ enum NotesMarkdown {
             }
 
             if let heading = heading(line) {
-                push(.heading(strong(inline(heading.text))))
+                push(.heading(inline(heading.text)))
                 i += 1
                 continue
             }
@@ -277,14 +279,5 @@ enum NotesMarkdown {
 
     static func number(_ marker: String) -> Int {
         Int(marker.dropLast()) ?? 1
-    }
-
-    static func strong(_ text: AttributedString) -> AttributedString {
-        var text = text
-        for run in text.runs {
-            let intent = run.inlinePresentationIntent ?? []
-            text[run.range].inlinePresentationIntent = intent.union(.stronglyEmphasized)
-        }
-        return text
     }
 }

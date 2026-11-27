@@ -678,3 +678,119 @@ struct SyncServiceTests {
     }
 
 }
+
+@Suite("Sync batches")
+struct SyncBatchTests {
+    /// A stand-in for /todos/sync: takes at most `syncBatchMax` changes, sorts
+    /// parents first within the request, rejects a subtask whose parent it
+    /// hasn't seen, and answers with every todo it holds.
+    @MainActor
+    private final class FakeServer {
+        var todos: [String: APITodo] = [:]
+        var failOnRequest: Int?
+        private var requests = 0
+
+        func handle(_ changes: [TodoChange]) throws -> SyncResponse {
+            requests += 1
+            let url = "https://api.example.com/todos/sync"
+            if requests == failOnRequest { throw APIError.serverError(429, "rate_limited", url: url) }
+            guard changes.count <= TodoChange.syncBatchMax else {
+                throw APIError.serverError(400, "validation_failed", url: url)
+            }
+            for change in changes.orderedForSync() {
+                if let parentId = change.parentId, todos[parentId] == nil {
+                    throw APIError.serverError(400, "parent not found", url: url)
+                }
+                todos[change.id] = APITodo(
+                    id: change.id, userId: "user_test_123", parentId: change.parentId,
+                    title: change.title ?? "", completed: false, position: change.position,
+                    createdAt: change.updatedAt, updatedAt: change.updatedAt
+                )
+            }
+            return SyncResponse(
+                todos: Array(todos.values),
+                syncedAt: "2025-06-01T00:00:00.000Z",
+                conflicts: []
+            )
+        }
+    }
+
+    /// 900 top-level todos and 300 subtasks, the subtasks inserted first.
+    @MainActor
+    private func seed(_ context: ModelContext) throws -> [TodoItem] {
+        let parents = (0..<900).map { TodoItem(title: "Todo \($0)", userId: "user_test_123", position: "a\($0)") }
+        let subtasks = (0..<300).map { index in
+            let subtask = TodoItem(title: "Subtask \(index)", userId: "user_test_123", position: "a\(index)")
+            subtask.parentId = parents[index * 3].id
+            return subtask
+        }
+        for todo in subtasks + parents {
+            todo.isSynced = false
+            context.insert(todo)
+        }
+        try context.save()
+        return subtasks + parents
+    }
+
+    @MainActor
+    /// The container comes back too: its context doesn't keep it alive.
+    private func makeService(
+        _ server: FakeServer
+    ) throws -> (SyncService, ModelContainer, MockAPIService) {
+        let api = MockAPIService()
+        api.syncHandler = { try server.handle($0) }
+        let container = try ModelContainer(
+            for: TodoItem.self, TodoUrl.self, TodoListModel.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let service = SyncService(authService: MockAuthService(), apiService: api)
+        service.setModelContext(container.mainContext)
+        return (service, container, api)
+    }
+
+    @Test("1,200 unsynced todos go in three batches, parents before subtasks, and all end up synced")
+    @MainActor
+    func batchesParentsFirst() async throws {
+        let server = FakeServer()
+        let (service, container, api) = try makeService(server)
+        let todos = try seed(container.mainContext)
+
+        await service.sync()
+
+        #expect(api.syncRequests.map(\.count) == [500, 500, 200])
+        let sent = api.syncRequests.flatMap { $0 }
+        let firstSubtask = sent.firstIndex { $0.parentId != nil } ?? sent.count
+        #expect(sent[..<firstSubtask].count == 900)
+        #expect(sent[firstSubtask...].allSatisfy { $0.parentId != nil })
+        #expect(Set(sent.map(\.id)).count == 1200)
+        #expect(todos.allSatisfy { $0.isSynced })
+        #expect(server.todos.count == 1200)
+        if case .success = service.state {} else { Issue.record("Expected success, got \(service.state)") }
+    }
+
+    @Test("a failed batch stops the sync and leaves the rest queued")
+    @MainActor
+    func failedBatchKeepsTheRest() async throws {
+        let server = FakeServer()
+        server.failOnRequest = 2
+        let (service, container, api) = try makeService(server)
+        let todos = try seed(container.mainContext)
+
+        await service.sync()
+
+        #expect(api.syncRequests.count == 2)
+        #expect(todos.filter { $0.isSynced }.count == 500)
+        #expect(service.state == .error("Too many requests. Try again in a minute."))
+
+        // The next sync sends what's left.
+        server.failOnRequest = nil
+        await service.sync()
+        #expect(api.syncRequests.dropFirst(2).map(\.count) == [500, 200])
+        #expect(todos.allSatisfy { $0.isSynced })
+    }
+
+    @Test("an empty queue still makes one sync, to pull the server's todos")
+    func emptyQueue() {
+        #expect([TodoChange]().syncBatches().map(\.count) == [0])
+    }
+}

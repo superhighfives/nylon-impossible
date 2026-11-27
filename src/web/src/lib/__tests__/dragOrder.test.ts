@@ -4,7 +4,6 @@ import {
   clampToTier,
   columnGapTop,
   columnPart,
-  dropLineY,
   dropPlacement,
   dropSlot,
   gapTop,
@@ -112,92 +111,20 @@ describe("dropPlacement", () => {
   });
 });
 
-describe("dropLineY", () => {
-  // Rows touching, as on the board: 40px, 40px, a three-line 88px row, 40px.
-  const rows = [
-    { top: 0, bottom: 40 },
-    { top: 40, bottom: 80 },
-    { top: 80, bottom: 168 },
-    { top: 168, bottom: 208 },
-  ];
-  const inside = (y: number) => rows.some((r) => y > r.top && y < r.bottom);
-
-  it("marks the boundary each slot lands between, never inside a row", () => {
-    expect(dropLineY(rows, 0, -1, 0)).toBe(0); // above the first row
-    expect(dropLineY(rows, 1, -1, 0)).toBe(40);
-    expect(dropLineY(rows, 2, -1, 0)).toBe(80); // above the three-line row
-    expect(dropLineY(rows, 3, -1, 0)).toBe(168); // below it
-    expect(dropLineY(rows, 4, -1, 0)).toBe(208); // below the last row
-    for (let slot = 0; slot <= rows.length; slot++) {
-      expect(inside(dropLineY(rows, slot, -1, 0) as number)).toBe(false);
-    }
-  });
-
-  it("centres the line in a gap between rows", () => {
-    const gapped = [
-      { top: 0, bottom: 40 },
-      { top: 50, bottom: 90 },
-    ];
-    expect(dropLineY(gapped, 1, -1, 0)).toBe(45);
-  });
-
-  it("skips over the dragged row's space for the other slots", () => {
-    // Dragging row 1: the others are rows 0, 2 and 3.
-    expect(dropLineY(rows, 0, 1, 0)).toBe(0);
-    expect(dropLineY(rows, 2, 1, 0)).toBe(168); // between rows 2 and 3
-    expect(dropLineY(rows, 3, 1, 0)).toBe(208);
-  });
-
-  it("puts its own slot at the dragged row's nearer edge", () => {
-    expect(dropLineY(rows, 1, 1, 45)).toBe(40);
-    expect(dropLineY(rows, 1, 1, 75)).toBe(80);
-  });
-
-  it("marks the pinned tier's boundary when the slot is clamped", () => {
-    // Two pinned rows, then two unpinned; an unpinned todo from another
-    // column dragged up over the pinned ones lands below them.
-    const items = [
-      row("p1", "a0", true),
-      row("p2", "a1", true),
-      row("a", "a0"),
-      row("b", "a1"),
-    ];
-    const mids = rows.map((r) => (r.top + r.bottom) / 2);
-    const { index } = dropPlacement(items, row("x", "a9"), slotAt(mids, 5));
-    expect(index).toBe(2);
-    expect(dropLineY(rows, index, -1, 5)).toBe(80);
-  });
-
-  it("has nowhere to go in an empty column", () => {
-    expect(dropLineY([], 0, -1, 0)).toBeNull();
-  });
-});
-
-describe("dropping on the dragged row's own faded slot", () => {
-  // "b" is dragged and keeps its space, faded, between "a" and "c".
+describe("dropping on the dragged row's own slot", () => {
+  // "b" is dragged; its space, between "a" and "c", is the gap.
   const items = [row("a", "a0"), row("b", "a1"), row("c", "a2")];
-  const rects = [
-    { top: 0, bottom: 40 },
-    { top: 40, bottom: 80 },
-    { top: 80, bottom: 120 },
-  ];
   const mids = [20, 100]; // "a" and "c": the dragged row is left out
 
-  it.each([
-    [42, 40],
-    [60, 40],
-    [61, 80],
-    [78, 80],
-  ])("a pointer at %i shows the line at %i and changes nothing", (y, line) => {
+  it.each([42, 60, 61, 78])("a pointer at %i changes nothing", (y) => {
     const slot = slotAt(mids, y);
     const { index, position } = dropPlacement(items, items[1], slot);
     expect(index).toBe(1);
     expect(position).toBe("a1");
-    expect(dropLineY(rects, index, 1, y)).toBe(line);
   });
 });
 
-describe("parting the rows around a touch drag", () => {
+describe("parting the rows around a drag", () => {
   // Five rows, 40 tall; the one at index 1 is dragged.
   const offsets = (slot: number) =>
     [0, 1, 2, 3, 4].map((i) => partOffset(1, slot, i, 40));
@@ -232,7 +159,7 @@ describe("parting the rows around a touch drag", () => {
   });
 });
 
-describe("the gap a touch drag opens", () => {
+describe("the gap a drag opens", () => {
   // Five rows, 40 tall from 8; the one at index 1 is dragged.
   const spans = [0, 1, 2, 3, 4].map((i) => ({
     top: 8 + i * 40,
@@ -271,7 +198,7 @@ describe("the gap a touch drag opens", () => {
   });
 });
 
-describe("a touch drag across the board's columns", () => {
+describe("a drag across the board's columns", () => {
   // Rows 40 tall from 8; a column's spans, n rows long.
   const spansOf = (n: number) =>
     Array.from({ length: n }, (_, i) => ({
@@ -279,7 +206,7 @@ describe("a touch drag across the board's columns", () => {
       bottom: 48 + i * 40,
     }));
 
-  describe("the slot, as the line's rule", () => {
+  describe("the slot, by the nearer half of a row", () => {
     const spans = spansOf(5);
 
     it("in its own column: the upper half goes above, the lower half below", () => {

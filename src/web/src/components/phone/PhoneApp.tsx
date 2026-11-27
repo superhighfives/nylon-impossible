@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { DndContext } from "@dnd-kit/core";
 import {
   BOARD_TIME_KINDS,
   type BoardView,
@@ -6,6 +6,7 @@ import {
   EMPTY_NEXT,
   waitingIn,
 } from "@nylon-impossible/shared";
+import { useHydrated } from "@tanstack/react-router";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
 import {
@@ -16,11 +17,19 @@ import {
   useRef,
   useState,
 } from "react";
+import { RAISED } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
-import { DragPreview } from "@/components/wide/useBoardDrag";
+import {
+  type ListDrag,
+  ListDropGap,
+  routeDrag,
+  useListDrag,
+  useListEntry,
+  useListSettle,
+} from "@/components/wide/useListDrag";
 import { useHints } from "@/hooks/useHints";
-import { useCreateList } from "@/hooks/useLists";
-import type { TodoWithUrls } from "@/types/database";
+import { useCreateList, useReorderLists } from "@/hooks/useLists";
+import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { AccountSheet } from "./AccountSheet";
 import { Composer } from "./Composer";
@@ -46,6 +55,83 @@ import { useBoardData } from "./useBoardData";
 import { usePhoneDrag } from "./usePhoneDrag";
 
 const EMPTY: TodoWithUrls[] = [];
+
+/** The Lists page's group of your lists, as a list drag names it. */
+const PHONE_LIST_GROUP = "phone";
+
+/**
+ * One of your lists on the Lists page: tap to open it, or long-press and
+ * drag to reorder, as on the iPhone. The rows part around a soft gap where
+ * it'll land, and the lifted one follows the finger.
+ */
+function ListPageRow({
+  list,
+  index,
+  count,
+  drag,
+  animate,
+  onOpen,
+}: {
+  list: SerializedList;
+  index: number;
+  count: number;
+  drag: ListDrag | null;
+  animate: boolean;
+  onOpen: (list: SerializedList) => void;
+}) {
+  const entry = useListEntry({
+    id: list.id,
+    group: PHONE_LIST_GROUP,
+    index,
+    drag,
+    animate,
+  });
+  return (
+    <li
+      ref={entry.ref}
+      data-list-entry={list.id}
+      data-lifted={entry.lifted ? "" : undefined}
+      style={entry.style}
+      className={`relative ${entry.lifted ? "z-10" : ""}`}
+    >
+      <div
+        style={entry.card}
+        className={entry.lifted ? `${RAISED} n-lifted` : undefined}
+      >
+        {/* Named by the list, the count as its description ("Groceries,
+            4 todos"), so the name matches what's visible. */}
+        <button
+          type="button"
+          aria-describedby={`phone-list-count-${list.id}`}
+          {...entry.listeners}
+          onClick={() => onOpen(list)}
+          className={`mx-5 flex min-h-11 w-[calc(100%-2.5rem)] cursor-pointer touch-pan-y items-center gap-3 py-3.5 text-left text-n-ink select-none n-focus-inset [-webkit-touch-callout:none] ${
+            entry.lifted ? "" : "border-b border-n-hairline"
+          }`}
+        >
+          <span className="min-w-0 flex-1 truncate font-n-display text-n-phone-title">
+            {list.name}
+          </span>
+          <span
+            aria-hidden="true"
+            className="text-n-phone-secondary text-n-ink-muted tabular-nums"
+          >
+            {count}
+          </span>
+          <span id={`phone-list-count-${list.id}`} hidden>
+            {plural(count, "todo")}
+          </span>
+          <ChevronRight
+            size={18}
+            strokeWidth={2.2}
+            aria-hidden="true"
+            className="text-n-ink-muted"
+          />
+        </button>
+      </div>
+    </li>
+  );
+}
 
 /** The pager page a view opens on: a time list, or Lists for any list. */
 function pageForView(view: BoardView | null | undefined): number {
@@ -80,7 +166,7 @@ export function PhoneApp({
     lists,
     todos,
     byKind,
-    collections,
+    collections: savedCollections,
     listName,
     listInSentence,
     actions,
@@ -96,7 +182,20 @@ export function PhoneApp({
     refetchLists,
     listsFetching,
   } = useBoardData();
+  // What the smoke suite and the marketing captures wait for: loaded and
+  // hydrated. The server renders the board with its data (#830), so without
+  // the second they'd act before the rows answer.
+  const hydrated = useHydrated();
   const createList = useCreateList();
+  const reorderLists = useReorderLists();
+  const listDrag = useListDrag({
+    lists: savedCollections,
+    onMove: reorderLists,
+  });
+  /** Your lists, in order: a just-dropped one until it's saved. */
+  const collections = listDrag.ordered(savedCollections);
+  const listsRef = useRef<HTMLUListElement>(null);
+  useListSettle(listsRef, listDrag.settle);
 
   const [pageIndex, setPageIndex] = useState(() => pageForView(view));
   const [collectionId, setCollectionId] = useState<string | null>(() =>
@@ -514,37 +613,30 @@ export function PhoneApp({
               timeZone,
             )}
           />
-          <ul className="pt-1.5">
-            {collections.map((list) => (
-              <li key={list.id}>
-                {/* Named by the list, the count as its description ("Groceries,
-                    4 todos"), so the name matches what's visible. */}
-                <button
-                  type="button"
-                  aria-describedby={`phone-list-count-${list.id}`}
-                  onClick={() => setCollectionId(list.id)}
-                  className="mx-5 flex min-h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center gap-3 border-b border-n-hairline py-3.5 text-left text-n-ink n-focus-inset"
-                >
-                  <span className="min-w-0 flex-1 truncate font-n-display text-n-phone-title">
-                    {list.name}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="text-n-phone-secondary text-n-ink-muted tabular-nums"
-                  >
-                    {rowsFor(list.id).length}
-                  </span>
-                  <span id={`phone-list-count-${list.id}`} hidden>
-                    {plural(rowsFor(list.id).length, "todo")}
-                  </span>
-                  <ChevronRight
-                    size={18}
-                    strokeWidth={2.2}
-                    aria-hidden="true"
-                    className="text-n-ink-muted"
-                  />
-                </button>
-              </li>
+          <ul
+            ref={listsRef}
+            data-list-group={PHONE_LIST_GROUP}
+            className="relative pt-1.5"
+          >
+            <ListDropGap
+              drag={listDrag.drag}
+              group={PHONE_LIST_GROUP}
+              animate={reducedMotion !== "reduce"}
+              inset="inset-x-3 inset-y-1"
+            />
+            {collections.map((list, index) => (
+              <ListPageRow
+                key={list.id}
+                list={list}
+                index={index}
+                count={rowsFor(list.id).length}
+                drag={listDrag.drag}
+                animate={reducedMotion !== "reduce"}
+                onOpen={(l) => {
+                  // The click that ends a pointer drag isn't a tap.
+                  if (!listDrag.justDragged.current) setCollectionId(l.id);
+                }}
+              />
             ))}
           </ul>
           <label className="flex items-center gap-2.5 px-5 py-4 text-n-ink-muted">
@@ -675,7 +767,7 @@ export function PhoneApp({
           sensors={drag.sensors}
           // Pages scroll up and down under a drag; the pager never swipes.
           autoScroll={{ threshold: { x: 0, y: 0.2 } }}
-          {...drag.handlers}
+          {...routeDrag(listDrag.handlers, drag.handlers)}
         >
           <div
             ref={pagerRef}
@@ -683,7 +775,7 @@ export function PhoneApp({
             onPointerDown={releaseScroll}
             onWheel={releaseScroll}
             onScrollEnd={releaseScroll}
-            data-phone-ready={loading ? undefined : ""}
+            data-phone-ready={loading || !hydrated ? undefined : ""}
             // Nothing to swipe to while loading, and a scroller with nothing
             // focusable in it is a dead end for the keyboard.
             className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
@@ -702,11 +794,6 @@ export function PhoneApp({
               </section>
             ))}
           </div>
-          <DragOverlay dropAnimation={null}>
-            {drag.drag?.mode === "pointer" ? (
-              <DragPreview todo={drag.drag.todo} tilt={drag.drag.tilt} />
-            ) : null}
-          </DragOverlay>
         </DndContext>
       </div>
 

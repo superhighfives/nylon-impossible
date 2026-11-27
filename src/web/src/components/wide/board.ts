@@ -172,8 +172,12 @@ export interface BoardContext {
   closeDetail: (toRow: boolean) => void;
   /** The right-click menu, under `row`, at `view`. */
   openMenu: (todo: TodoWithUrls, row: HTMLElement, view: MenuView) => void;
+  /** Your list's ⋯ menu, from the keys (the time lists have none). */
+  openColumnMenu: (listId: string) => void;
   openMoveTo: (todo: TodoWithUrls) => void;
   jump: (target: JumpTarget) => void;
+  /** Move the list whose sidebar entry has focus one place up or down. */
+  moveList: (delta: 1 | -1) => void;
   startGo: () => void;
   newTodo: () => void;
   newList: () => void;
@@ -250,8 +254,12 @@ export function createBoard(ctx: BoardContext): Board {
         return;
       }
       const at = row ? rows.indexOf(row) : -1;
-      // From a column with nothing selected, ↓ starts at the top, ↑ at the end.
-      if (at === -1) (delta > 0 ? rows[0] : rows.at(-1))?.focus();
+      // From a column with nothing selected, ↓ starts at the top (Add, where
+      // there is one), ↑ at the end.
+      if (at === -1) {
+        if (delta > 0 && ctx.hasAdd(column)) ctx.focusAdd(column, false);
+        else (delta > 0 ? rows[0] : rows.at(-1))?.focus();
+      }
       // ↑ from the first todo reaches Add.
       else if (at === 0 && delta < 0 && ctx.hasAdd(column)) {
         ctx.focusAdd(column, false);
@@ -379,7 +387,13 @@ export function createBoard(ctx: BoardContext): Board {
     },
     menu: () => {
       const { row, todo } = current();
-      if (row && todo) ctx.openMenu(todo, row, "main");
+      if (row && todo) return ctx.openMenu(todo, row, "main");
+      // On a column with nothing selected: your list's ⋯ menu, as `.` opens
+      // a todo's (principle 7).
+      const at = here();
+      if (!row && isColumnSection(at.id) && !onAdd()) {
+        ctx.openColumnMenu(at.id);
+      }
     },
     remove: () => {
       const { row, todo, done } = current();
@@ -398,6 +412,7 @@ export function createBoard(ctx: BoardContext): Board {
     },
     palette: ctx.togglePalette,
     jump: ctx.jump,
+    moveList: ctx.moveList,
     startGo: ctx.startGo,
     goToList: ctx.goToList,
     shortcuts: ctx.toggleShortcuts,

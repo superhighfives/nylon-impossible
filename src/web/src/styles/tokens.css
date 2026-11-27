@@ -40,7 +40,7 @@
   --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 8%, transparent);
 
   --n-board-column-min-width: 17rem;
-  --n-board-column-max-width: 35rem;
+  --n-board-column-max-width: 30rem;
   --n-board-section-outline-width: 0.25rem;
   --n-board-hatch-angle: 45deg;
   --n-board-hatch-width: 0.0625rem;
@@ -118,6 +118,10 @@
   --text-n-phone-body--line-height: 1.375rem;
   --text-n-phone-body--font-weight: 400;
   --text-n-phone-body--letter-spacing: 0em;
+  --text-n-phone-note-body: 0.9375rem;
+  --text-n-phone-note-body--line-height: 1.3125rem;
+  --text-n-phone-note-body--font-weight: 400;
+  --text-n-phone-note-body--letter-spacing: 0em;
   --text-n-phone-meta: 0.8125rem;
   --text-n-phone-meta--line-height: 1.125rem;
   --text-n-phone-meta--font-weight: 400;
@@ -182,10 +186,6 @@
   --text-n-phone-empty-line--line-height: 1.4375rem;
   --text-n-phone-empty-line--font-weight: 400;
   --text-n-phone-empty-line--letter-spacing: 0em;
-  --text-n-phone-notes: 1.0625rem;
-  --text-n-phone-notes--line-height: 1.5625rem;
-  --text-n-phone-notes--font-weight: 400;
-  --text-n-phone-notes--letter-spacing: 0em;
   --text-n-phone-weekday: 0.6875rem;
   --text-n-phone-weekday--line-height: 1.0625rem;
   --text-n-phone-weekday--font-weight: 500;
@@ -234,6 +234,10 @@
   --text-n-wide-notes--line-height: 1.3125rem;
   --text-n-wide-notes--font-weight: 400;
   --text-n-wide-notes--letter-spacing: 0em;
+  --text-n-wide-note-body: 0.8125rem;
+  --text-n-wide-note-body--line-height: 1.125rem;
+  --text-n-wide-note-body--font-weight: 400;
+  --text-n-wide-note-body--letter-spacing: 0em;
   --text-n-wide-control: 0.9375rem;
   --text-n-wide-control--line-height: 1.25rem;
   --text-n-wide-control--font-weight: 600;

@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -298,6 +299,29 @@ describe("SettingsScreen: API token", () => {
     renderSettings(false);
     await act(async () => {});
     expect(tokenRequests()).toEqual([]);
+  });
+});
+
+describe("SettingsScreen: About", () => {
+  it("lists Privacy policy, Terms of service, then Report a problem, each in a new tab", async () => {
+    renderSettings();
+    const about = (await screen.findByRole("heading", { name: "About" }))
+      .parentElement as HTMLElement;
+    const links = within(about).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Privacy policy",
+      "Terms of service",
+      "Report a problem",
+    ]);
+    const report = within(about).getByRole("link", {
+      name: "Report a problem",
+    });
+    expect(report).toHaveAttribute(
+      "href",
+      "https://github.com/superhighfives/nylon-impossible/issues/new/choose",
+    );
+    expect(report).toHaveAttribute("target", "_blank");
+    expect(report).toHaveAttribute("rel", "noopener");
   });
 });
 

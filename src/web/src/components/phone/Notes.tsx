@@ -80,7 +80,19 @@ function inlines(nodes: Inline[]): ReactNode[] {
  * Its tooltip reads "Copy", then "Copied" until it closes.
  */
 const COPY_BUTTON =
-  "absolute top-0 right-0 flex size-6 cursor-pointer items-center justify-center rounded-n-chip border border-n-hairline bg-n-surface text-n-ink-muted opacity-0 pointer-events-none transition-opacity duration-(--n-duration-fast) ease-n-out n-focus-soft focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/code:pointer-events-auto group-hover/code:opacity-100 pointer-fine:hover:text-n-ink";
+  "absolute right-0 flex size-6 cursor-pointer items-center justify-center rounded-n-chip border border-n-hairline bg-n-surface text-n-ink-muted opacity-0 pointer-events-none transition-opacity duration-(--n-duration-fast) ease-n-out n-focus-soft focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/code:pointer-events-auto group-hover/code:opacity-100 pointer-fine:hover:text-n-ink";
+
+/**
+ * The room outside a code block, above and below: one notes line less the
+ * block's `p-3` (`space.scale.3`), so the padding and this make up the two
+ * fence lines the editor shows, and nothing below moves (principle 8). The
+ * block's wrapper is its own formatting context, so a typed blank line's
+ * `GAP` adds to it instead of collapsing into it.
+ */
+const CODE_SPACE = "my-[calc(1lh-var(--spacing)*3)]";
+
+/** Copy's offset from the wrapper's top: the fill's top-right corner. */
+const COPY_TOP = "top-[calc(1lh-var(--spacing)*3)]";
 
 const TOOLTIP =
   "rounded-n-chip border border-n-hairline bg-n-surface px-2 py-1 text-n-phone-caption text-n-ink shadow-[0_4px_12px_color-mix(in_srgb,black_12%,transparent)] transition-opacity duration-(--n-duration-fast) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0";
@@ -100,8 +112,10 @@ function CodeBlock({ text, className }: { text: string; className: string }) {
   };
 
   return (
-    <div className={`group/code relative ${className}`}>
-      <pre className="n-code m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap">
+    <div className={`group/code relative flow-root ${className}`}>
+      <pre
+        className={`n-code mx-0 ${CODE_SPACE} rounded-n-chip bg-n-fill p-3 break-words whitespace-pre-wrap`}
+      >
         <code>{text}</code>
       </pre>
       <Tooltip.Root
@@ -118,7 +132,7 @@ function CodeBlock({ text, className }: { text: string; className: string }) {
               type="button"
               aria-label="Copy code"
               onClick={copy}
-              className={COPY_BUTTON}
+              className={`${COPY_BUTTON} ${COPY_TOP}`}
             />
           }
         >
@@ -177,11 +191,12 @@ function blocks(nodes: Block[]): ReactNode[] {
           </p>
         );
       case "heading": {
-        // Body-sized, so a note never outshouts the todo's title.
+        // The notes' size, so a note never outshouts the todo's title, in
+        // semibold, so it reads apart from inline bold.
         const Heading = (["h3", "h4", "h5"] as const)[node.level - 1];
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
-          <Heading key={i} className={`m-0 font-bold text-inherit ${gap}`}>
+          <Heading key={i} className={`m-0 font-semibold text-inherit ${gap}`}>
             {inlines(node.children)}
           </Heading>
         );

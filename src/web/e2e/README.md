@@ -1,8 +1,8 @@
 # Smoke suite
 
 Playwright specs that sign in and use the running web app: add, done, move,
-edit, lists, drag and the keyboard, on two projects, **wide** (1440×900) and
-**phone** (iPhone 15, touch). CI runs them as the `smoke` job in
+edit, lists, drag, the keyboard and the server render, on two projects,
+**wide** (1440×900) and **phone** (iPhone 15, touch). CI runs them as the `smoke` job in
 `web-deploy.yml`, against each PR's preview, after `deploy-preview`.
 
 ## The account
@@ -49,7 +49,7 @@ BASE_URL=https://….workers.dev bun run --cwd src/web e2e
 - Ask for `board` to get a page that's signed in and seeded.
 - Find things by role and label (`getByRole`, `getByLabel`). Fall back to the
   app's `data-*` hooks (`data-column`, `data-row-container`,
-  `data-drop-indicator`) only where no role pins the element.
+  `data-drop-gap`) only where no role pins the element.
 - Put `tag` in any title you create, so an assertion never matches a leftover.
 - To check that a write survived a reload, call `watchWrite(page, text)` before
   the action and pass its promise to `reload`. A write is a non-GET request to

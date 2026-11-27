@@ -89,23 +89,31 @@ final class SyncService {
         state = .syncing
 
         do {
-            // 1. Gather local changes (unsynced items for this user)
-            let localChanges = try gatherLocalChanges(userId: userId)
-            let localChangeIds = Set(localChanges.map { $0.id })
+            // 1. Gather local changes (unsynced items for this user), in
+            // batches the server accepts, parents before subtasks
+            var response: SyncResponse?
+            for batch in try gatherLocalChanges(userId: userId).syncBatches() {
+                // 2. Send to server, get remote changes
+                // Always request all items (nil lastSyncedAt) so we can detect server-side deletions
+                let batchResponse = try await apiService.sync(
+                    lastSyncedAt: nil,
+                    changes: batch
+                )
 
-            // 2. Send to server, get remote changes
-            // Always request all items (nil lastSyncedAt) so we can detect server-side deletions
-            let response = try await apiService.sync(
-                lastSyncedAt: nil,
-                changes: localChanges
-            )
-
-            // 3. Apply all changes in a single atomic operation
-            try applySync(
-                remoteTodos: response.todos,
-                localChangeIds: localChangeIds,
-                userId: userId
-            )
+                // 3. Apply all changes in a single atomic operation. Only this
+                // batch is marked synced; a failure in a later one leaves the
+                // rest queued for the next sync.
+                try applySync(
+                    remoteTodos: batchResponse.todos,
+                    localChangeIds: Set(batch.map { $0.id }),
+                    userId: userId
+                )
+                response = batchResponse
+            }
+            guard let response else {
+                state = lastSyncedAt.map { .success($0) } ?? .idle
+                return
+            }
 
             // Lists (Today/This week/Someday + custom) are server-authoritative
             // and rarely change — a lightweight fetch-and-upsert alongside the
